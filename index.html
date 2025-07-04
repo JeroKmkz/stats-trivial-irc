@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Logs de Trivial IRC</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            border: 2px dashed #ddd;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .upload-section:hover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .team-section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .team-header {
+            padding: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stats-table th, .stats-table td {
+            padding: 8px 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        .stats-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .player-row {
+            background-color: white;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .log-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Procesador de Logs de Trivial IRC</h1>
+        
+        <div class="upload-section">
+            <h3>Selecciona el archivo log (.txt)</h3>
+            <input type="file" id="fileInput" accept=".txt" />
+            <br>
+            <button class="button" onclick="processLog()" id="processBtn" disabled>
+                Procesar Log
+            </button>
+        </div>
+
+        <div id="results" class="results" style="display: none;"></div>
+        
+        <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
+            <button class="button" onclick="downloadExcel()" id="downloadBtn">
+                📥 Descargar Excel
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const COLORES_EQUIPOS = {
+            "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
+            "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
+            "REPESCA@S": {"bg": "#C000C0", "fg": "#00FF00"},
+            "DARKSHADOWS": {"bg": "#000000", "fg": "#808080"},
+            "TELERINEZ": {"bg": "#000000", "fg": "#00FFFF"},
+            "KAMIKAZES": {"bg": "#000000", "fg": "#FF0000"},
+            "HARDBE@TS": {"bg": "#000000", "fg": "#FFFF00"},
+            "LIDERES": {"bg": "#C000C0", "fg": "#FFFFFF"}
+        };
+
+        let processedData = null;
+        let fileName = '';
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileName = file.name;
+                document.getElementById('processBtn').disabled = false;
+            }
+        });
+
+        function processLog() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Por favor selecciona un archivo');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    const data = parseLogFile(content);
+                    displayResults(data);
+                    processedData = data;
+                    document.getElementById('downloadSection').style.display = 'block';
+                } catch (error) {
+                    showError('Error al procesar el archivo: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseLogFile(content) {
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+            
+            // Buscar sección de clasificación de equipos
+            const teamStartIndex = lines.findIndex(line => line.includes('CLASIFICACION EQUIPOS'));
+            if (teamStartIndex === -1) {
+                throw new Error('No se encontró la sección CLASIFICACION EQUIPOS');
+            }
+
+            // Buscar sección de clasificación individual
+            const playerStartIndex = lines.findIndex(line => line.includes('CLASIFICACION INDIVIDUAL'));
+            if (playerStartIndex === -1) {
+                throw new Error('No se encontró la sección CLASIFICACION INDIVIDUAL');
+            }
+
+            // Extraer equipos y sus puntuaciones
+            const teams = {};
+            const teamOrder = [];
+            for (let i = teamStartIndex + 1; i < playerStartIndex; i++) {
+                const line = lines[i];
+                if (line) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        const teamName = parts[0];
+                        const points = parseInt(parts[1]);
+                        teams[teamName] = points;
+                        teamOrder.push(teamName);
+                    }
+                }
+            }
+
+            // Extraer jugadores
+            const players = [];
+            for (let i = playerStartIndex + 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (line) {
+                    const player = parsePlayerLine(line);
+                    if (player) {
+                        players.push(player);
+                    }
+                }
+            }
+
+            // Asignar equipos a jugadores usando la lógica de ruptura alfabética
+            const teamNames = Object.keys(teams).sort();
+            const playersWithTeams = assignTeamsToPlayers(players, teamNames);
+
+            // Ordenar equipos por puntuación (ganador primero)
+            const sortedTeams = teamOrder.sort((a, b) => teams[b] - teams[a]);
+
+            return {
+                teams: teams,
+                teamOrder: sortedTeams,
+                players: playersWithTeams
+            };
+        }
+
+        function parsePlayerLine(line) {
+            const parts = line.split(/\s+/);
+            if (parts.length < 2) return null;
+
+            const name = parts[0];
+            const points = parseInt(parts[1]);
+
+            if (line.includes('NO ESTUVO PRESENTE')) {
+                return {
+                    name: name.toUpperCase(),
+                    points: null,
+                    aces: null,
+                    scratches: null,
+                    palos: null,
+                    absent: true
+                };
+            }
+
+            // Extraer estadísticas
+            let aces = 0, scratches = 0, palos = 0;
+            
+            const acesMatch = line.match(/Aces:\s*(\d+)/);
+            if (acesMatch) aces = parseInt(acesMatch[1]);
+            
+            const scrMatch = line.match(/Scr:\s*(\d+)/);
+            if (scrMatch) scratches = parseInt(scrMatch[1]);
+            
+            const palosMatch = line.match(/Palos:\s*(\d+)/);
+            if (palosMatch) palos = parseInt(palosMatch[1]);
+
+            return {
+                name: name.toUpperCase(),
+                points: points,
+                aces: aces,
+                scratches: scratches,
+                palos: palos,
+                absent: false
+            };
+        }
+
+        function assignTeamsToPlayers(players, teamNames) {
+            const result = [];
+            let currentTeamIndex = 0;
+            let lastFirstChar = '';
+
+            for (let i = 0; i < players.length; i++) {
+                const player = players[i];
+                const firstChar = player.name.charAt(0).toUpperCase();
+
+                // Verificar si hay ruptura alfabética
+                if (i > 0 && firstChar < lastFirstChar) {
+                    currentTeamIndex++;
+                }
+
+                if (currentTeamIndex < teamNames.length) {
+                    player.team = teamNames[currentTeamIndex];
+                    result.push(player);
+                }
+
+                lastFirstChar = firstChar;
+            }
+
+            return result;
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            // Mostrar información del log
+            const logInfo = document.createElement('div');
+            logInfo.className = 'log-info';
+            logInfo.innerHTML = `
+                <h3>📊 Información del Log</h3>
+                <p><strong>Equipos encontrados:</strong> ${data.teamOrder.length}</p>
+                <p><strong>Jugadores procesados:</strong> ${data.players.length}</p>
+                <p><strong>Ganador:</strong> ${data.teamOrder[0]} (${data.teams[data.teamOrder[0]]} puntos)</p>
+            `;
+            resultsDiv.appendChild(logInfo);
+
+            // Mostrar cada equipo
+            data.teamOrder.forEach(teamName => {
+                const teamPlayers = data.players.filter(p => p.team === teamName);
+                
+                // Ordenar jugadores: primero por puntos (descendente), luego ausentes al final
+                teamPlayers.sort((a, b) => {
+                    if (a.absent && !b.absent) return 1;
+                    if (!a.absent && b.absent) return -1;
+                    if (a.absent && b.absent) return 0;
+                    return b.points - a.points;
+                });
+
+                const teamDiv = createTeamDisplay(teamName, teamPlayers, data.teams[teamName]);
+                resultsDiv.appendChild(teamDiv);
+            });
+
+            resultsDiv.style.display = 'block';
+            showSuccess('Log procesado correctamente');
+        }
+
+        function createTeamDisplay(teamName, players, teamPoints) {
+            const teamDiv = document.createElement('div');
+            teamDiv.className = 'team-section';
+
+            const colors = COLORES_EQUIPOS[teamName] || {bg: '#cccccc', fg: '#000000'};
+            
+            const header = document.createElement('div');
+            header.className = 'team-header';
+            header.style.backgroundColor = colors.bg;
+            header.style.color = colors.fg;
+            header.textContent = `${teamName} - ${teamPoints} puntos`;
+
+            const table = document.createElement('table');
+            table.className = 'stats-table';
+            
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = `
+                <th></th>
+                <th>Puntos</th>
+                <th>Scratches</th>
+                <th>Palos</th>
+                <th>Aces</th>
+            `;
+            table.appendChild(headerRow);
+
+            players.forEach(player => {
+                const row = document.createElement('tr');
+                row.className = 'player-row';
+                
+                const pointsValue = player.absent ? '' : player.points;
+                const scratchesValue = player.absent ? '' : player.scratches;
+                const palosValue = player.absent ? '' : player.palos;
+                const acesValue = player.absent ? '' : player.aces;
+
+                row.innerHTML = `
+                    <td style="text-align: left; font-weight: bold;">${player.name}</td>
+                    <td>${pointsValue}</td>
+                    <td>${scratchesValue}</td>
+                    <td>${palosValue}</td>
+                    <td>${acesValue}</td>
+                `;
+                table.appendChild(row);
+            });
+
+            teamDiv.appendChild(header);
+            teamDiv.appendChild(table);
+            return teamDiv;
+        }
+
+        function downloadExcel() {
+            if (!processedData) {
+                showError('No hay datos procesados para descargar');
+                return;
+            }
+
+            try {
+                const workbook = XLSX.utils.book_new();
+                const worksheetData = [];
+
+                // Crear datos para Excel
+                processedData.teamOrder.forEach(teamName => {
+                    const teamPlayers = processedData.players.filter(p => p.team === teamName);
+                    
+                    // Ordenar jugadores
+                    teamPlayers.sort((a, b) => {
+                        if (a.absent && !b.absent) return 1;
+                        if (!a.absent && b.absent) return -1;
+                        if (a.absent && b.absent) return 0;
+                        return b.points - a.points;
+                    });
+
+                    // Fila de encabezado del equipo
+                    worksheetData.push([teamName, 'Puntos', 'Scratches', 'Palos', 'Aces']);
+
+                    // Filas de jugadores
+                    teamPlayers.forEach(player => {
+                        const pointsValue = player.absent ? '' : player.points;
+                        const scratchesValue = player.absent ? '' : player.scratches;
+                        const palosValue = player.absent ? '' : player.palos;
+                        const acesValue = player.absent ? '' : player.aces;
+
+                        worksheetData.push([
+                            player.name,
+                            pointsValue,
+                            scratchesValue,
+                            palosValue,
+                            acesValue
+                        ]);
+                    });
+
+                    // Fila vacía entre equipos
+                    worksheetData.push(['', '', '', '', '']);
+                });
+
+                const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Estadísticas');
+                
+                // Crear blob y enlace de descarga
+                const excelBuffer = XLSX.write(workbook, {bookType: 'xlsx', type: 'array'});
+                const blob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+                
+                // Crear enlace temporal para forzar descarga
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                
+                const cleanFileName = fileName.replace(/\.txt$/, '');
+                link.download = `${cleanFileName}_estadisticas.xlsx`;
+                
+                // Añadir al DOM, hacer clic y eliminar
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Limpiar URL
+                window.URL.revokeObjectURL(url);
+                
+                showSuccess('Archivo Excel descargado correctamente');
+            } catch (error) {
+                showError('Error al generar el Excel: ' + error.message);
+                console.error('Error:', error);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+            setTimeout(() => successDiv.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

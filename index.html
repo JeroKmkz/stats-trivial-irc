@@ -461,70 +461,79 @@
 
                 const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
                 
-                // Definir el rango
+                // Aplicar estilos basado en tu código Python
                 const range = XLSX.utils.decode_range(worksheet['!ref']);
                 
-                // Función para convertir color hex a RGB para Excel
-                function hexToRgb(hex) {
-                    const r = parseInt(hex.slice(1, 3), 16);
-                    const g = parseInt(hex.slice(3, 5), 16);
-                    const b = parseInt(hex.slice(5, 7), 16);
-                    return { r, g, b };
-                }
-                
-                // Aplicar estilos a encabezados de equipos y bordes
+                // Crear estilos para cada equipo basado en COLORES_EQUIPOS
                 let colIndex = 0;
                 teams.forEach((team, teamIndex) => {
-                    const bgRgb = hexToRgb(team.colors.bg);
-                    const fgRgb = hexToRgb(team.colors.fg);
+                    const teamColors = team.colors;
                     
-                    // Colorear las 5 columnas del equipo (nombre + 4 estadísticas)
+                    // Aplicar formato a las 5 columnas del equipo (nombre + 4 estadísticas)
                     for (let col = 0; col < 5; col++) {
-                        const cellAddress = XLSX.utils.encode_cell({r: 0, c: colIndex + col});
-                        if (worksheet[cellAddress]) {
-                            worksheet[cellAddress].s = {
+                        const cellRef = XLSX.utils.encode_cell({r: 0, c: colIndex + col});
+                        if (worksheet[cellRef]) {
+                            // Crear formato similar al de tu código Python
+                            worksheet[cellRef].s = {
                                 fill: {
-                                    patternType: 'solid',
-                                    fgColor: { rgb: team.colors.bg.replace('#', 'FF') }
+                                    patternType: "solid",
+                                    fgColor: { rgb: teamColors.bg.replace('#', '') }
                                 },
-                                font: { 
-                                    color: { rgb: team.colors.fg.replace('#', 'FF') }, 
+                                font: {
+                                    color: { rgb: teamColors.fg.replace('#', '') },
                                     bold: true,
                                     sz: 11
                                 },
-                                alignment: { horizontal: 'center', vertical: 'center' },
+                                alignment: {
+                                    horizontal: "center",
+                                    vertical: "center"
+                                },
                                 border: {
-                                    top: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    bottom: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    left: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    right: { style: 'thin', color: { rgb: 'FF000000' } }
+                                    top: { style: "thin", color: { rgb: "000000" } },
+                                    bottom: { style: "thin", color: { rgb: "000000" } },
+                                    left: { style: "thin", color: { rgb: "000000" } },
+                                    right: { style: "thin", color: { rgb: "000000" } }
                                 }
                             };
+                            
+                            // Para equipos con fondo negro, aplicar borde blanco como en tu código
+                            if (teamColors.bg === "#000000") {
+                                worksheet[cellRef].s.border = {
+                                    top: { style: "thin", color: { rgb: "FFFFFF" } },
+                                    bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+                                    left: { style: "thin", color: { rgb: "FFFFFF" } },
+                                    right: { style: "thin", color: { rgb: "FFFFFF" } }
+                                };
+                            }
                         }
                     }
-                    colIndex += (teamIndex < teams.length - 1) ? 6 : 5; // +1 para separador excepto el último
+                    colIndex += (teamIndex < teams.length - 1) ? 6 : 5;
                 });
                 
-                // Aplicar bordes a todas las celdas con datos (filas de jugadores)
+                // Aplicar bordes a todas las celdas de datos (filas de jugadores)
                 for (let row = 1; row <= range.e.r; row++) {
                     for (let col = 0; col <= range.e.c; col++) {
-                        const cellAddress = XLSX.utils.encode_cell({r: row, c: col});
-                        if (worksheet[cellAddress] && worksheet[cellAddress].v !== '') {
-                            worksheet[cellAddress].s = {
+                        const cellRef = XLSX.utils.encode_cell({r: row, c: col});
+                        if (worksheet[cellRef]) {
+                            worksheet[cellRef].s = {
                                 border: {
-                                    top: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    bottom: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    left: { style: 'thin', color: { rgb: 'FF000000' } },
-                                    right: { style: 'thin', color: { rgb: 'FF000000' } }
+                                    top: { style: "thin", color: { rgb: "000000" } },
+                                    bottom: { style: "thin", color: { rgb: "000000" } },
+                                    left: { style: "thin", color: { rgb: "000000" } },
+                                    right: { style: "thin", color: { rgb: "000000" } }
                                 },
-                                alignment: { horizontal: 'center', vertical: 'center' }
+                                alignment: {
+                                    horizontal: "center",
+                                    vertical: "center"
+                                }
                             };
                             
-                            // Para la primera columna de cada equipo (nombres), alinear a la izquierda
+                            // Para nombres de jugadores (primera columna de cada equipo), alinear a la izquierda
                             let checkCol = 0;
                             for (let t = 0; t < teams.length; t++) {
                                 if (col === checkCol) {
-                                    worksheet[cellAddress].s.alignment = { horizontal: 'left', vertical: 'center' };
+                                    worksheet[cellRef].s.alignment.horizontal = "left";
+                                    worksheet[cellRef].s.font = { bold: true };
                                     break;
                                 }
                                 checkCol += (t < teams.length - 1) ? 6 : 5;
@@ -533,11 +542,10 @@
                     }
                 }
                 
-                // Ajustar ancho de columnas
+                // Configurar ancho de columnas
                 const colWidths = [];
-                let colIdx = 0;
                 teams.forEach((team, teamIndex) => {
-                    colWidths.push({wch: 15}); // Nombre del jugador (más ancho)
+                    colWidths.push({wch: 15}); // Nombre del jugador
                     colWidths.push({wch: 8});  // Puntos
                     colWidths.push({wch: 10}); // Scratches
                     colWidths.push({wch: 8});  // Palos
@@ -550,15 +558,22 @@
 
                 XLSX.utils.book_append_sheet(workbook, worksheet, 'Estadísticas');
                 
-                // Crear blob y enlace de descarga
+                // Usar configuración similar a tu código Python para escritura
                 const excelBuffer = XLSX.write(workbook, {
-                    bookType: 'xlsx', 
+                    bookType: 'xlsx',
                     type: 'array',
-                    cellStyles: true
+                    compression: true,
+                    Props: {
+                        Title: "Estadísticas Trivial IRC",
+                        Author: "Trivial IRC Processor"
+                    }
                 });
-                const blob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
                 
-                // Crear enlace temporal para forzar descarga
+                const blob = new Blob([excelBuffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                
+                // Crear enlace de descarga
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -566,18 +581,15 @@
                 const cleanFileName = fileName.replace(/\.txt$/, '');
                 link.download = `${cleanFileName}_estadisticas.xlsx`;
                 
-                // Añadir al DOM, hacer clic y eliminar
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                
-                // Limpiar URL
                 window.URL.revokeObjectURL(url);
                 
                 showSuccess('Archivo Excel descargado correctamente');
             } catch (error) {
                 showError('Error al generar el Excel: ' + error.message);
-                console.error('Error:', error);
+                console.error('Error completo:', error);
             }
         }
 

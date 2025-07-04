@@ -392,10 +392,9 @@
 
             try {
                 const workbook = XLSX.utils.book_new();
-                const worksheetData = [];
-
-                // Crear datos para Excel
-                processedData.teamOrder.forEach(teamName => {
+                
+                // Preparar datos de equipos
+                const teams = processedData.teamOrder.map(teamName => {
                     const teamPlayers = processedData.players.filter(p => p.team === teamName);
                     
                     // Ordenar jugadores
@@ -405,31 +404,114 @@
                         if (a.absent && b.absent) return 0;
                         return b.points - a.points;
                     });
-
-                    // Fila de encabezado del equipo
-                    worksheetData.push([teamName, 'Puntos', 'Scratches', 'Palos', 'Aces']);
-
-                    // Filas de jugadores
-                    teamPlayers.forEach(player => {
-                        const pointsValue = player.absent ? '' : player.points;
-                        const scratchesValue = player.absent ? '' : player.scratches;
-                        const palosValue = player.absent ? '' : player.palos;
-                        const acesValue = player.absent ? '' : player.aces;
-
-                        worksheetData.push([
-                            player.name,
-                            pointsValue,
-                            scratchesValue,
-                            palosValue,
-                            acesValue
-                        ]);
-                    });
-
-                    // Fila vacía entre equipos
-                    worksheetData.push(['', '', '', '', '']);
+                    
+                    return {
+                        name: teamName,
+                        points: processedData.teams[teamName],
+                        players: teamPlayers,
+                        colors: COLORES_EQUIPOS[teamName] || {bg: '#cccccc', fg: '#000000'}
+                    };
                 });
 
+                // Crear matriz de datos para Excel (equipos lado a lado)
+                const maxPlayers = Math.max(...teams.map(team => team.players.length));
+                const worksheetData = [];
+                
+                // Fila de encabezados
+                const headerRow = [];
+                teams.forEach(team => {
+                    headerRow.push(team.name);
+                    headerRow.push('Puntos');
+                    headerRow.push('Scratches');
+                    headerRow.push('Palos');
+                    headerRow.push('Aces');
+                    if (teams.indexOf(team) < teams.length - 1) {
+                        headerRow.push(''); // Separador entre equipos
+                    }
+                });
+                worksheetData.push(headerRow);
+
+                // Filas de jugadores
+                for (let i = 0; i < maxPlayers; i++) {
+                    const playerRow = [];
+                    teams.forEach(team => {
+                        if (i < team.players.length) {
+                            const player = team.players[i];
+                            const pointsValue = player.absent ? '' : player.points;
+                            const scratchesValue = player.absent ? '' : player.scratches;
+                            const palosValue = player.absent ? '' : player.palos;
+                            const acesValue = player.absent ? '' : player.aces;
+                            
+                            playerRow.push(player.name);
+                            playerRow.push(pointsValue);
+                            playerRow.push(scratchesValue);
+                            playerRow.push(palosValue);
+                            playerRow.push(acesValue);
+                        } else {
+                            // Celdas vacías si el equipo tiene menos jugadores
+                            playerRow.push('', '', '', '', '');
+                        }
+                        
+                        if (teams.indexOf(team) < teams.length - 1) {
+                            playerRow.push(''); // Separador entre equipos
+                        }
+                    });
+                    worksheetData.push(playerRow);
+                }
+
                 const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+                
+                // Aplicar estilos y colores
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                
+                // Estilos para encabezados de equipos
+                let colIndex = 0;
+                teams.forEach((team, teamIndex) => {
+                    // Colorear las 5 columnas del equipo (nombre + 4 estadísticas)
+                    for (let col = 0; col < 5; col++) {
+                        const cellAddress = XLSX.utils.encode_cell({r: 0, c: colIndex + col});
+                        if (worksheet[cellAddress]) {
+                            worksheet[cellAddress].s = {
+                                fill: {fgColor: {rgb: team.colors.bg.replace('#', '')}},
+                                font: {color: {rgb: team.colors.fg.replace('#', '')}, bold: true},
+                                alignment: {horizontal: 'center'},
+                                border: {
+                                    top: {style: 'thin'},
+                                    bottom: {style: 'thin'},
+                                    left: {style: 'thin'},
+                                    right: {style: 'thin'}
+                                }
+                            };
+                        }
+                    }
+                    colIndex += (teamIndex < teams.length - 1) ? 6 : 5; // +1 para separador excepto el último
+                });
+                
+                // Aplicar bordes a todas las celdas con datos
+                for (let row = 0; row <= range.e.r; row++) {
+                    for (let col = 0; col <= range.e.c; col++) {
+                        const cellAddress = XLSX.utils.encode_cell({r: row, c: col});
+                        if (worksheet[cellAddress]) {
+                            if (!worksheet[cellAddress].s) {
+                                worksheet[cellAddress].s = {};
+                            }
+                            worksheet[cellAddress].s.border = {
+                                top: {style: 'thin'},
+                                bottom: {style: 'thin'},
+                                left: {style: 'thin'},
+                                right: {style: 'thin'}
+                            };
+                        }
+                    }
+                }
+                
+                // Ajustar ancho de columnas
+                const colWidths = [];
+                for (let col = 0; col <= range.e.c; col++) {
+                    colWidths.push({wch: 12});
+                }
+                worksheet['!cols'] = colWidths;
+
                 XLSX.utils.book_append_sheet(workbook, worksheet, 'Estadísticas');
                 
                 // Crear blob y enlace de descarga

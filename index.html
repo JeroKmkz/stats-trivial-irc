@@ -113,7 +113,7 @@
   <div class="container">
     <h1>🎯 Procesador de Logs de Trivial IRC</h1>
     <div class="upload-section">
-      <h3>Selecciona el archivo log (.txt)</h3>
+      <h3>Selecciona los archivos log (.txt)</h3>
       <input type="file" id="fileInput" accept=".txt" multiple />
       <br />
       <button class="button" onclick="processLogs()" id="processBtn" disabled>Procesar Logs</button>
@@ -316,10 +316,11 @@
       try {
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet("Estadísticas");
+        const totalsWs = wb.addWorksheet("Totales");
 
         let currentRow = 1;
 
-        // Procesar cada partida
+        // Procesar cada partida en la hoja principal
         processedData.forEach((matchData, matchIndex) => {
           const teams = matchData.teamOrder.map(teamName => {
             const players = matchData.players.filter(p => p.team === teamName);
@@ -498,6 +499,9 @@
           ws.columns = colWidths.map(width => ({ width }));
         }
 
+        // GENERAR HOJA DE TOTALES
+        generateTotalsSheet(totalsWs);
+
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = URL.createObjectURL(blob);
@@ -515,6 +519,196 @@
         console.error(err);
         showError("Error generando Excel: " + err.message);
       }
+    }
+
+    function generateTotalsSheet(ws) {
+      // Recopilar datos de todos los jugadores de todas las partidas
+      const playerTotals = {};
+      
+      processedData.forEach(matchData => {
+        matchData.players.forEach(player => {
+          if (!player.absent) {
+            const playerName = player.name;
+            
+            if (!playerTotals[playerName]) {
+              playerTotals[playerName] = {
+                name: playerName,
+                team: player.team,
+                totalPoints: 0,
+                totalPalos: 0,
+                totalScratches: 0,
+                totalAces: 0,
+                gamesPlayed: 0
+              };
+            }
+            
+            playerTotals[playerName].totalPoints += player.points || 0;
+            playerTotals[playerName].totalPalos += player.palos || 0;
+            playerTotals[playerName].totalScratches += player.scratches || 0;
+            playerTotals[playerName].totalAces += player.aces || 0;
+            playerTotals[playerName].gamesPlayed += 1;
+          }
+        });
+      });
+
+      // Convertir a array y calcular promedios
+      const players = Object.values(playerTotals).map(player => ({
+        ...player,
+        avgPoints: player.gamesPlayed > 0 ? player.totalPoints / player.gamesPlayed : 0,
+        avgPalos: player.gamesPlayed > 0 ? player.totalPalos / player.gamesPlayed : 0,
+        avgScratches: player.gamesPlayed > 0 ? player.totalScratches / player.gamesPlayed : 0,
+        avgAces: player.gamesPlayed > 0 ? player.totalAces / player.gamesPlayed : 0
+      }));
+
+      // Función para obtener colores del equipo
+      function getTeamColors(teamName) {
+        return COLORES_EQUIPOS[teamName] || { bg: "#000000", fg: "#000000" };
+      }
+
+      // TABLA 1: PUNTOS (ordenada por avgPoints)
+      const pointsData = [...players].sort((a, b) => b.avgPoints - a.avgPoints);
+      
+      // Headers para PUNTOS
+      ws.getCell(1, 1).value = "PUNTOS";
+      ws.getCell(2, 2).value = "TOT";
+      ws.getCell(2, 3).value = "JUG";
+      ws.getCell(2, 4).value = "AVG";
+      
+      pointsData.forEach((player, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(player.team);
+        
+        // Nombre del jugador con colores de equipo
+        const nameCell = ws.getCell(row, 1);
+        nameCell.value = player.name;
+        nameCell.font = {
+          color: { argb: colors.fg.replace("#", "FF") }
+        };
+        if (colors.bg !== "#000000") {
+          nameCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.bg.replace("#", "FF") }
+          };
+        }
+        
+        ws.getCell(row, 2).value = player.totalPoints;
+        ws.getCell(row, 3).value = player.gamesPlayed;
+        ws.getCell(row, 4).value = Math.round(player.avgPoints * 10) / 10; // 1 decimal
+      });
+
+      // TABLA 2: POSTES (ordenada por avgPalos) - Columna 6
+      const palosData = [...players].sort((a, b) => b.avgPalos - a.avgPalos);
+      
+      ws.getCell(1, 6).value = "POSTES";
+      ws.getCell(2, 7).value = "TOT";
+      ws.getCell(2, 8).value = "JUG";
+      ws.getCell(2, 9).value = "AVG";
+      
+      palosData.forEach((player, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(player.team);
+        
+        const nameCell = ws.getCell(row, 6);
+        nameCell.value = player.name;
+        nameCell.font = {
+          color: { argb: colors.fg.replace("#", "FF") }
+        };
+        if (colors.bg !== "#000000") {
+          nameCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.bg.replace("#", "FF") }
+          };
+        }
+        
+        ws.getCell(row, 7).value = player.totalPalos;
+        ws.getCell(row, 8).value = player.gamesPlayed;
+        ws.getCell(row, 9).value = Math.round(player.avgPalos * 10) / 10;
+      });
+
+      // TABLA 3: SCRATCHES (ordenada por avgScratches) - Columna 11
+      const scratchesData = [...players].sort((a, b) => b.avgScratches - a.avgScratches);
+      
+      ws.getCell(1, 11).value = "SCRATCHES";
+      ws.getCell(2, 12).value = "TOT";
+      ws.getCell(2, 13).value = "JUG";
+      ws.getCell(2, 14).value = "AVG";
+      
+      scratchesData.forEach((player, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(player.team);
+        
+        const nameCell = ws.getCell(row, 11);
+        nameCell.value = player.name;
+        nameCell.font = {
+          color: { argb: colors.fg.replace("#", "FF") }
+        };
+        if (colors.bg !== "#000000") {
+          nameCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.bg.replace("#", "FF") }
+          };
+        }
+        
+        ws.getCell(row, 12).value = player.totalScratches;
+        ws.getCell(row, 13).value = player.gamesPlayed;
+        ws.getCell(row, 14).value = Math.round(player.avgScratches * 10) / 10;
+      });
+
+      // TABLA 4: ACES (ordenada por avgAces) - Columna 16
+      const acesData = [...players].sort((a, b) => b.avgAces - a.avgAces);
+      
+      ws.getCell(1, 16).value = "ACES";
+      ws.getCell(2, 17).value = "TOT";
+      ws.getCell(2, 18).value = "JUG";
+      ws.getCell(2, 19).value = "AVG";
+      
+      acesData.forEach((player, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(player.team);
+        
+        const nameCell = ws.getCell(row, 16);
+        nameCell.value = player.name;
+        nameCell.font = {
+          color: { argb: colors.fg.replace("#", "FF") }
+        };
+        if (colors.bg !== "#000000") {
+          nameCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.bg.replace("#", "FF") }
+          };
+        }
+        
+        ws.getCell(row, 17).value = player.totalAces;
+        ws.getCell(row, 18).value = player.gamesPlayed;
+        ws.getCell(row, 19).value = Math.round(player.avgAces * 10) / 10;
+      });
+
+      // Configurar anchos de columna
+      ws.columns = [
+        { width: 15 }, // Nombres PUNTOS
+        { width: 8 },  // TOT
+        { width: 8 },  // JUG  
+        { width: 8 },  // AVG
+        { width: 3 },  // Separador
+        { width: 15 }, // Nombres POSTES
+        { width: 8 },  // TOT
+        { width: 8 },  // JUG
+        { width: 8 },  // AVG
+        { width: 3 },  // Separador
+        { width: 15 }, // Nombres SCRATCHES
+        { width: 8 },  // TOT
+        { width: 8 },  // JUG
+        { width: 8 },  // AVG
+        { width: 3 },  // Separador
+        { width: 15 }, // Nombres ACES
+        { width: 8 },  // TOT
+        { width: 8 },  // JUG
+        { width: 8 }   // AVG
+      ];
     }
 
     function showError(msg) {

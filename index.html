@@ -337,12 +337,12 @@
         });
         ws.addRow(teamTotalRow);
 
-        // Aplicar formato a FILA 1 (headers generales - SIN NEGRITA)
+        // Aplicar formato a FILA 1 (headers generales - SIN NEGRITA, tamaño 13)
         let col = 1;
         teams.forEach((team, teamIndex) => {
           for (let i = 0; i < 5; i++) {
             const cell = ws.getCell(1, col + i);
-            cell.font = { bold: false }; // SIN NEGRITA
+            cell.font = { bold: false, size: 13 }; // SIN NEGRITA, tamaño 13
             cell.alignment = { horizontal: "center", vertical: "center" };
             cell.border = {
               top: { style: "thin" }, left: { style: "thin" },
@@ -369,6 +369,12 @@
                 color: { argb: team.colors.fg.replace("#", "FF") },
                 bold: true,
                 size: 14 // Aumentado 2 puntos (de 12 a 14)
+              };
+            } else if (i === 1) {
+              // La segunda celda (puntos del equipo) con negrita
+              cell.font = {
+                bold: true, // CON NEGRITA para los puntos del equipo
+                size: 12
               };
             } else {
               // Las demás celdas (valores) sin color de fondo y sin negrita

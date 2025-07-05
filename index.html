@@ -313,7 +313,7 @@
         // Determinar número máximo de jugadores real (sin filas vacías)
         const maxPlayers = Math.max(...teams.map(t => t.players.length));
 
-        // FILA 1: Headers generales
+        // FILA 1: Headers generales (sin negrita)
         const generalHeaderRow = [];
         teams.forEach((team, index) => {
           generalHeaderRow.push(''); // Vacío para nombre
@@ -337,12 +337,12 @@
         });
         ws.addRow(teamTotalRow);
 
-        // Aplicar formato a FILA 1 (headers generales)
+        // Aplicar formato a FILA 1 (headers generales - SIN NEGRITA)
         let col = 1;
         teams.forEach((team, teamIndex) => {
           for (let i = 0; i < 5; i++) {
             const cell = ws.getCell(1, col + i);
-            cell.font = { bold: true };
+            cell.font = { bold: false }; // SIN NEGRITA
             cell.alignment = { horizontal: "center", vertical: "center" };
             cell.border = {
               top: { style: "thin" }, left: { style: "thin" },
@@ -357,16 +357,27 @@
         teams.forEach((team, teamIndex) => {
           for (let i = 0; i < 5; i++) {
             const cell = ws.getCell(2, col + i);
-            cell.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: team.colors.bg.replace("#", "FF") }
-            };
-            cell.font = {
-              color: { argb: team.colors.fg.replace("#", "FF") },
-              bold: true,
-              size: 12
-            };
+            
+            // Solo la primera celda (nombre del equipo) tiene color de fondo y negrita
+            if (i === 0) {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: team.colors.bg.replace("#", "FF") }
+              };
+              cell.font = {
+                color: { argb: team.colors.fg.replace("#", "FF") },
+                bold: true,
+                size: 14 // Aumentado 2 puntos (de 12 a 14)
+              };
+            } else {
+              // Las demás celdas (valores) sin color de fondo y sin negrita
+              cell.font = {
+                bold: false, // SIN NEGRITA
+                size: 12
+              };
+            }
+            
             cell.alignment = { horizontal: "center", vertical: "center" };
             cell.border = {
               top: { style: "medium" }, left: { style: "medium" },
@@ -412,9 +423,9 @@
                   bottom: { style: "thin" }, right: { style: "thin" }
                 };
                 
-                if (j === 0) { // Nombre del jugador
+                if (j === 0) { // Nombre del jugador - SIN NEGRITA
                   cell.alignment = { horizontal: "left", vertical: "center" };
-                  cell.font = { bold: true };
+                  cell.font = { bold: false }; // SIN NEGRITA
                 } else {
                   cell.alignment = { horizontal: "center", vertical: "center" };
                 }

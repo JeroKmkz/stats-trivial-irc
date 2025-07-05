@@ -297,6 +297,183 @@
           };
         });
 
+        // Calcular totales por equipo
+        const teamTotals = teams.map(team => {
+          const totals = { scratches: 0, palos: 0, aces: 0 };
+          team.players.forEach(player => {
+            if (!player.absent) {
+              totals.scratches += player.scratches;
+              totals.palos += player.palos;
+              totals.aces += player.aces;
+            }
+          });
+          return totals;
+        });
+
+        // Determinar número máximo de jugadores real (sin filas vacías)
+        const maxPlayers = Math.max(...teams.map(t => t.players.length));
+
+        // FILA 1: Headers generales
+        const generalHeaderRow = [];
+        teams.forEach((team, index) => {
+          generalHeaderRow.push(''); // Vacío para nombre
+          generalHeaderRow.push("Puntos");
+          generalHeaderRow.push("Scratches");  
+          generalHeaderRow.push("Palos");
+          generalHeaderRow.push("Aces");
+          if (index < teams.length - 1) generalHeaderRow.push(''); // Separador más grande
+        });
+        ws.addRow(generalHeaderRow);
+
+        // FILA 2: Nombres de equipos con totales
+        const teamTotalRow = [];
+        teams.forEach((team, index) => {
+          teamTotalRow.push(team.name);
+          teamTotalRow.push(team.points);
+          teamTotalRow.push(teamTotals[index].scratches);
+          teamTotalRow.push(teamTotals[index].palos);
+          teamTotalRow.push(teamTotals[index].aces);
+          if (index < teams.length - 1) teamTotalRow.push(''); // Separador
+        });
+        ws.addRow(teamTotalRow);
+
+        // Aplicar formato a FILA 1 (headers generales)
+        let col = 1;
+        teams.forEach((team, teamIndex) => {
+          for (let i = 0; i < 5; i++) {
+            const cell = ws.getCell(1, col + i);
+            cell.font = { bold: true };
+            cell.alignment = { horizontal: "center", vertical: "center" };
+            cell.border = {
+              top: { style: "thin" }, left: { style: "thin" },
+              bottom: { style: "thin" }, right: { style: "thin" }
+            };
+          }
+          col += (teamIndex < teams.length - 1) ? 6 : 5;
+        });
+
+        // Aplicar formato a FILA 2 (equipos con totales)
+        col = 1;
+        teams.forEach((team, teamIndex) => {
+          for (let i = 0; i < 5; i++) {
+            const cell = ws.getCell(2, col + i);
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: team.colors.bg.replace("#", "FF") }
+            };
+            cell.font = {
+              color: { argb: team.colors.fg.replace("#", "FF") },
+              bold: true,
+              size: 12
+            };
+            cell.alignment = { horizontal: "center", vertical: "center" };
+            cell.border = {
+              top: { style: "medium" }, left: { style: "medium" },
+              bottom: { style: "medium" }, right: { style: "medium" }
+            };
+          }
+          col += (teamIndex < teams.length - 1) ? 6 : 5;
+        });
+
+        // FILAS 3+: Jugadores (solo las filas que tienen jugadores)
+        for (let i = 0; i < maxPlayers; i++) {
+          const hasPlayerInRow = teams.some(team => i < team.players.length);
+          if (!hasPlayerInRow) break; // Cortar si no hay más jugadores en ningún equipo
+
+          const row = [];
+          teams.forEach((team, teamIndex) => {
+            const player = team.players[i];
+            if (player) {
+              row.push(
+                player.name, 
+                player.absent ? '' : player.points, 
+                player.absent ? '' : player.scratches, 
+                player.absent ? '' : player.palos, 
+                player.absent ? '' : player.aces
+              );
+            } else {
+              row.push('', '', '', '', ''); // Celda vacía sin formato
+            }
+            if (teamIndex < teams.length - 1) row.push(''); // Separador
+          });
+          ws.addRow(row);
+
+          // Aplicar formato solo a celdas con datos
+          const rowNumber = i + 3;
+          col = 1;
+          teams.forEach((team, teamIndex) => {
+            const player = team.players[i];
+            if (player) { // Solo aplicar formato si hay jugador
+              for (let j = 0; j < 5; j++) {
+                const cell = ws.getCell(rowNumber, col + j);
+                cell.border = {
+                  top: { style: "thin" }, left: { style: "thin" },
+                  bottom: { style: "thin" }, right: { style: "thin" }
+                };
+                
+                if (j === 0) { // Nombre del jugador
+                  cell.alignment = { horizontal: "left", vertical: "center" };
+                  cell.font = { bold: true };
+                } else {
+                  cell.alignment = { horizontal: "center", vertical: "center" };
+                }
+              }
+            }
+            col += (teamIndex < teams.length - 1) ? 6 : 5;
+          });
+        }
+
+        // Configurar ancho de columnas (separador más ancho)
+        const colWidths = [];
+        teams.forEach((team, teamIndex) => {
+          colWidths.push(15); // Nombre del jugador
+          colWidths.push(8);  // Puntos
+          colWidths.push(10); // Scratches
+          colWidths.push(8);  // Palos
+          colWidths.push(8);  // Aces
+          if (teamIndex < teams.length - 1) colWidths.push(6); // Separador más grande (6 en lugar de 2)
+        });
+        
+        ws.columns = colWidths.map(width => ({ width }));
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName.replace(/\.txt$/, '') + '_estadisticas.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+        showSuccess("Excel generado correctamente");
+      } catch (err) {
+        console.error(err);
+        showError("Error generando Excel: " + err.message);
+      }
+    }
+
+    function showError(msg) {
+      const div = document.createElement("div");
+      div.className = "error";
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 5000);
+    }
+
+    function showSuccess(msg) {
+      const div = document.createElement("div");
+      div.className = "success";
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 3000);
+    }
+  </script>
+</body>
+</html>
+            colors: COLORES_EQUIPOS[teamName] || { bg: "#CCCCCC", fg: "#000000" }
+          };
+        });
+
         const maxPlayers = Math.max(...teams.map(t => t.players.length));
 
         // FILA 1: Nombres de equipos con puntos totales

@@ -1,613 +1,376 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Logs de Trivial IRC</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .upload-section {
-            border: 2px dashed #ddd;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 30px;
-            border-radius: 8px;
-            background-color: #fafafa;
-        }
-        .upload-section:hover {
-            border-color: #007bff;
-            background-color: #f0f8ff;
-        }
-        input[type="file"] {
-            margin: 20px 0;
-        }
-        .button {
-            background-color: #007bff;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 10px;
-        }
-        .button:hover {
-            background-color: #0056b3;
-        }
-        .button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .results {
-            margin-top: 30px;
-        }
-        .team-section {
-            margin-bottom: 30px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .team-header {
-            padding: 15px;
-            font-weight: bold;
-            font-size: 18px;
-            text-align: center;
-        }
-        .stats-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .stats-table th, .stats-table td {
-            padding: 8px 12px;
-            text-align: center;
-            border: 1px solid #ddd;
-        }
-        .stats-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        .player-row {
-            background-color: white;
-        }
-        .error {
-            color: #dc3545;
-            background-color: #f8d7da;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .success {
-            color: #155724;
-            background-color: #d4edda;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .log-info {
-            background-color: #e9ecef;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Procesador de Logs de Trivial IRC</title>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .upload-section {
+      border: 2px dashed #ddd;
+      padding: 40px;
+      text-align: center;
+      margin-bottom: 30px;
+      border-radius: 8px;
+      background-color: #fafafa;
+    }
+    .upload-section:hover {
+      border-color: #007bff;
+      background-color: #f0f8ff;
+    }
+    input[type="file"] {
+      margin: 20px 0;
+    }
+    .button {
+      background-color: #007bff;
+      color: white;
+      padding: 12px 25px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    .button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    .results {
+      margin-top: 30px;
+    }
+    .team-section {
+      margin-bottom: 30px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .team-header {
+      padding: 15px;
+      font-weight: bold;
+      font-size: 18px;
+      text-align: center;
+    }
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .stats-table th, .stats-table td {
+      padding: 8px 12px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+    .stats-table th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+    }
+    .player-row {
+      background-color: white;
+    }
+    .error {
+      color: #dc3545;
+      background-color: #f8d7da;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .success {
+      color: #155724;
+      background-color: #d4edda;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .log-info {
+      background-color: #e9ecef;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎯 Procesador de Logs de Trivial IRC</h1>
-        
-        <div class="upload-section">
-            <h3>Selecciona el archivo log (.txt)</h3>
-            <input type="file" id="fileInput" accept=".txt" />
-            <br>
-            <button class="button" onclick="processLog()" id="processBtn" disabled>
-                Procesar Log
-            </button>
-        </div>
-
-        <div id="results" class="results" style="display: none;"></div>
-        
-        <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
-            <button class="button" onclick="downloadExcel()" id="downloadBtn">
-                📥 Descargar Excel
-            </button>
-        </div>
+  <div class="container">
+    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
+    <div class="upload-section">
+      <h3>Selecciona el archivo log (.txt)</h3>
+      <input type="file" id="fileInput" accept=".txt" />
+      <br />
+      <button class="button" onclick="processLog()" id="processBtn" disabled>Procesar Log</button>
     </div>
 
-    <script>
-        const COLORES_EQUIPOS = {
-            "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
-            "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
-            "REPESCA@S": {"bg": "#C000C0", "fg": "#00FF00"},
-            "DARKSHADOWS": {"bg": "#000000", "fg": "#808080"},
-            "TELERINEZ": {"bg": "#000000", "fg": "#00FFFF"},
-            "KAMIKAZES": {"bg": "#000000", "fg": "#FF0000"},
-            "HARDBE@TS": {"bg": "#000000", "fg": "#FFFF00"},
-            "LIDERES": {"bg": "#C000C0", "fg": "#FFFFFF"}
+    <div id="results" class="results" style="display: none;"></div>
+
+    <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
+      <button class="button" onclick="downloadExcel()" id="downloadBtn">📥 Descargar Excel</button>
+    </div>
+  </div>
+
+  <script>
+    const COLORES_EQUIPOS = {
+      "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
+      "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
+      "REPESCA@S": {"bg": "#C000C0", "fg": "#00FF00"},
+      "DARKSHADOWS": {"bg": "#000000", "fg": "#808080"},
+      "TELERINEZ": {"bg": "#000000", "fg": "#00FFFF"},
+      "KAMIKAZES": {"bg": "#000000", "fg": "#FF0000"},
+      "HARDBE@TS": {"bg": "#000000", "fg": "#FFFF00"},
+      "LIDERES": {"bg": "#C000C0", "fg": "#FFFFFF"}
+    };
+
+    let processedData = null;
+    let fileName = '';
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        fileName = file.name;
+        document.getElementById('processBtn').disabled = false;
+      }
+    });
+
+    function processLog() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return showError("Selecciona un archivo");
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const content = e.target.result;
+          const data = parseLogFile(content);
+          processedData = data;
+          displayResults(data);
+          document.getElementById('downloadSection').style.display = 'block';
+        } catch (error) {
+          showError('Error al procesar el archivo: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function parseLogFile(content) {
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      const teamStart = lines.findIndex(l => l.includes('CLASIFICACION EQUIPOS'));
+      const playerStart = lines.findIndex(l => l.includes('CLASIFICACION INDIVIDUAL'));
+      if (teamStart === -1 || playerStart === -1) throw new Error("Secciones no encontradas");
+
+      const teams = {};
+      const teamOrder = [];
+      for (let i = teamStart + 1; i < playerStart; i++) {
+        const [team, points] = lines[i].split(/\s+/);
+        teams[team] = parseInt(points);
+        teamOrder.push(team);
+      }
+
+      const players = [];
+      for (let i = playerStart + 1; i < lines.length; i++) {
+        const line = lines[i];
+        const parts = line.split(/\s+/);
+        if (parts.length < 2) continue;
+        const name = parts[0];
+        const points = parseInt(parts[1]);
+        const player = {
+          name: name.toUpperCase(),
+          points: line.includes('NO ESTUVO PRESENTE') ? null : points,
+          aces: (line.match(/Aces:\s*(\d+)/) || [])[1] || 0,
+          scratches: (line.match(/Scr:\s*(\d+)/) || [])[1] || 0,
+          palos: (line.match(/Palos:\s*(\d+)/) || [])[1] || 0,
+          absent: line.includes('NO ESTUVO PRESENTE')
         };
+        players.push(player);
+      }
 
-        let processedData = null;
-        let fileName = '';
+      const teamNames = Object.keys(teams).sort();
+      let index = 0, lastInitial = '';
+      players.forEach(p => {
+        const initial = p.name.charAt(0).toUpperCase();
+        if (initial < lastInitial) index++;
+        p.team = teamNames[index] || 'SinEquipo';
+        lastInitial = initial;
+      });
 
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                fileName = file.name;
-                document.getElementById('processBtn').disabled = false;
-            }
+      return {
+        teams,
+        teamOrder: teamOrder.sort((a,b) => teams[b]-teams[a]),
+        players
+      };
+    }
+
+    function displayResults(data) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      const info = document.createElement('div');
+      info.className = 'log-info';
+      info.innerHTML = `
+        <h3>📊 Información del Log</h3>
+        <p><strong>Equipos encontrados:</strong> ${data.teamOrder.length}</p>
+        <p><strong>Jugadores procesados:</strong> ${data.players.length}</p>
+        <p><strong>Ganador:</strong> ${data.teamOrder[0]} (${data.teams[data.teamOrder[0]]} puntos)</p>
+      `;
+      resultsDiv.appendChild(info);
+
+      data.teamOrder.forEach(team => {
+        const players = data.players.filter(p => p.team === team);
+        players.sort((a,b) => {
+          if (a.absent && !b.absent) return 1;
+          if (!a.absent && b.absent) return -1;
+          return (b.points || 0) - (a.points || 0);
         });
 
-        function processLog() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                showError('Por favor selecciona un archivo');
-                return;
-            }
+        const teamDiv = document.createElement('div');
+        teamDiv.className = 'team-section';
+        const colors = COLORES_EQUIPOS[team] || { bg: "#ccc", fg: "#000" };
+        const header = document.createElement('div');
+        header.className = 'team-header';
+        header.style.backgroundColor = colors.bg;
+        header.style.color = colors.fg;
+        header.textContent = `${team} - ${data.teams[team]} puntos`;
+        teamDiv.appendChild(header);
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const content = e.target.result;
-                    const data = parseLogFile(content);
-                    displayResults(data);
-                    processedData = data;
-                    document.getElementById('downloadSection').style.display = 'block';
-                } catch (error) {
-                    showError('Error al procesar el archivo: ' + error.message);
-                }
+        const table = document.createElement('table');
+        table.className = 'stats-table';
+        table.innerHTML = `
+          <tr>
+            <th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Aces</th>
+          </tr>
+        `;
+        players.forEach(p => {
+          const row = document.createElement('tr');
+          row.className = 'player-row';
+          row.innerHTML = `
+            <td style="text-align: left; font-weight: bold;">${p.name}</td>
+            <td>${p.absent ? '' : p.points}</td>
+            <td>${p.absent ? '' : p.scratches}</td>
+            <td>${p.absent ? '' : p.palos}</td>
+            <td>${p.absent ? '' : p.aces}</td>
+          `;
+          table.appendChild(row);
+        });
+
+        teamDiv.appendChild(table);
+        resultsDiv.appendChild(teamDiv);
+      });
+
+      resultsDiv.style.display = 'block';
+      showSuccess("Log procesado correctamente");
+    }
+
+    async function downloadExcel() {
+      if (!processedData) return showError("No hay datos procesados");
+      try {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("Estadísticas");
+
+        const teams = processedData.teamOrder.map(teamName => {
+          const players = processedData.players.filter(p => p.team === teamName);
+          players.sort((a,b) => {
+            if (a.absent && !b.absent) return 1;
+            if (!a.absent && b.absent) return -1;
+            return (b.points || 0) - (a.points || 0);
+          });
+          return {
+            name: teamName,
+            players,
+            colors: COLORES_EQUIPOS[teamName] || { bg: "#CCCCCC", fg: "#000000" }
+          };
+        });
+
+        const maxPlayers = Math.max(...teams.map(t => t.players.length));
+        const headerRow = [];
+        teams.forEach(t => {
+          headerRow.push(t.name, "Puntos", "Scratches", "Palos", "Aces");
+          if (teams.indexOf(t) < teams.length - 1) headerRow.push('');
+        });
+        ws.addRow(headerRow);
+
+        let col = 1;
+        teams.forEach(t => {
+          for (let i = 0; i < 5; i++) {
+            const c = ws.getRow(1).getCell(col + i);
+            c.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: t.colors.bg.replace("#", "") }
             };
-            reader.readAsText(file);
-        }
-
-        function parseLogFile(content) {
-            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
-            
-            // Buscar sección de clasificación de equipos
-            const teamStartIndex = lines.findIndex(line => line.includes('CLASIFICACION EQUIPOS'));
-            if (teamStartIndex === -1) {
-                throw new Error('No se encontró la sección CLASIFICACION EQUIPOS');
-            }
-
-            // Buscar sección de clasificación individual
-            const playerStartIndex = lines.findIndex(line => line.includes('CLASIFICACION INDIVIDUAL'));
-            if (playerStartIndex === -1) {
-                throw new Error('No se encontró la sección CLASIFICACION INDIVIDUAL');
-            }
-
-            // Extraer equipos y sus puntuaciones
-            const teams = {};
-            const teamOrder = [];
-            for (let i = teamStartIndex + 1; i < playerStartIndex; i++) {
-                const line = lines[i];
-                if (line) {
-                    const parts = line.split(/\s+/);
-                    if (parts.length >= 2) {
-                        const teamName = parts[0];
-                        const points = parseInt(parts[1]);
-                        teams[teamName] = points;
-                        teamOrder.push(teamName);
-                    }
-                }
-            }
-
-            // Extraer jugadores
-            const players = [];
-            for (let i = playerStartIndex + 1; i < lines.length; i++) {
-                const line = lines[i];
-                if (line) {
-                    const player = parsePlayerLine(line);
-                    if (player) {
-                        players.push(player);
-                    }
-                }
-            }
-
-            // Asignar equipos a jugadores usando la lógica de ruptura alfabética
-            const teamNames = Object.keys(teams).sort();
-            const playersWithTeams = assignTeamsToPlayers(players, teamNames);
-
-            // Ordenar equipos por puntuación (ganador primero)
-            const sortedTeams = teamOrder.sort((a, b) => teams[b] - teams[a]);
-
-            return {
-                teams: teams,
-                teamOrder: sortedTeams,
-                players: playersWithTeams
+            c.font = {
+              color: { argb: t.colors.fg.replace("#", "") },
+              bold: true
             };
-        }
-
-        function parsePlayerLine(line) {
-            const parts = line.split(/\s+/);
-            if (parts.length < 2) return null;
-
-            const name = parts[0];
-            const points = parseInt(parts[1]);
-
-            if (line.includes('NO ESTUVO PRESENTE')) {
-                return {
-                    name: name.toUpperCase(),
-                    points: null,
-                    aces: null,
-                    scratches: null,
-                    palos: null,
-                    absent: true
-                };
-            }
-
-            // Extraer estadísticas
-            let aces = 0, scratches = 0, palos = 0;
-            
-            const acesMatch = line.match(/Aces:\s*(\d+)/);
-            if (acesMatch) aces = parseInt(acesMatch[1]);
-            
-            const scrMatch = line.match(/Scr:\s*(\d+)/);
-            if (scrMatch) scratches = parseInt(scrMatch[1]);
-            
-            const palosMatch = line.match(/Palos:\s*(\d+)/);
-            if (palosMatch) palos = parseInt(palosMatch[1]);
-
-            return {
-                name: name.toUpperCase(),
-                points: points,
-                aces: aces,
-                scratches: scratches,
-                palos: palos,
-                absent: false
+            c.alignment = { horizontal: "center" };
+            c.border = {
+              top: { style: "thin" }, left: { style: "thin" },
+              bottom: { style: "thin" }, right: { style: "thin" }
             };
-        }
+          }
+          col += 6;
+        });
 
-        function assignTeamsToPlayers(players, teamNames) {
-            const result = [];
-            let currentTeamIndex = 0;
-            let lastFirstChar = '';
-
-            for (let i = 0; i < players.length; i++) {
-                const player = players[i];
-                const firstChar = player.name.charAt(0).toUpperCase();
-
-                // Verificar si hay ruptura alfabética
-                if (i > 0 && firstChar < lastFirstChar) {
-                    currentTeamIndex++;
-                }
-
-                if (currentTeamIndex < teamNames.length) {
-                    player.team = teamNames[currentTeamIndex];
-                    result.push(player);
-                }
-
-                lastFirstChar = firstChar;
+        for (let i = 0; i < maxPlayers; i++) {
+          const row = [];
+          teams.forEach(t => {
+            const p = t.players[i];
+            if (p) {
+              row.push(p.name, p.points ?? '', p.scratches ?? '', p.palos ?? '', p.aces ?? '');
+            } else {
+              row.push('', '', '', '', '');
             }
-
-            return result;
+            if (teams.indexOf(t) < teams.length - 1) row.push('');
+          });
+          ws.addRow(row);
         }
 
-        function displayResults(data) {
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '';
+        ws.columns = headerRow.map(() => ({ width: 14 }));
 
-            // Mostrar información del log
-            const logInfo = document.createElement('div');
-            logInfo.className = 'log-info';
-            logInfo.innerHTML = `
-                <h3>📊 Información del Log</h3>
-                <p><strong>Equipos encontrados:</strong> ${data.teamOrder.length}</p>
-                <p><strong>Jugadores procesados:</strong> ${data.players.length}</p>
-                <p><strong>Ganador:</strong> ${data.teamOrder[0]} (${data.teams[data.teamOrder[0]]} puntos)</p>
-            `;
-            resultsDiv.appendChild(logInfo);
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName.replace(/\.txt$/, '') + '_estadisticas.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+        showSuccess("Excel generado correctamente");
+      } catch (err) {
+        console.error(err);
+        showError("Error generando Excel");
+      }
+    }
 
-            // Mostrar cada equipo
-            data.teamOrder.forEach(teamName => {
-                const teamPlayers = data.players.filter(p => p.team === teamName);
-                
-                // Ordenar jugadores: primero por puntos (descendente), luego ausentes al final
-                teamPlayers.sort((a, b) => {
-                    if (a.absent && !b.absent) return 1;
-                    if (!a.absent && b.absent) return -1;
-                    if (a.absent && b.absent) return 0;
-                    return b.points - a.points;
-                });
+    function showError(msg) {
+      const div = document.createElement("div");
+      div.className = "error";
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 5000);
+    }
 
-                const teamDiv = createTeamDisplay(teamName, teamPlayers, data.teams[teamName]);
-                resultsDiv.appendChild(teamDiv);
-            });
-
-            resultsDiv.style.display = 'block';
-            showSuccess('Log procesado correctamente');
-        }
-
-        function createTeamDisplay(teamName, players, teamPoints) {
-            const teamDiv = document.createElement('div');
-            teamDiv.className = 'team-section';
-
-            const colors = COLORES_EQUIPOS[teamName] || {bg: '#cccccc', fg: '#000000'};
-            
-            const header = document.createElement('div');
-            header.className = 'team-header';
-            header.style.backgroundColor = colors.bg;
-            header.style.color = colors.fg;
-            header.textContent = `${teamName} - ${teamPoints} puntos`;
-
-            const table = document.createElement('table');
-            table.className = 'stats-table';
-            
-            const headerRow = document.createElement('tr');
-            headerRow.innerHTML = `
-                <th></th>
-                <th>Puntos</th>
-                <th>Scratches</th>
-                <th>Palos</th>
-                <th>Aces</th>
-            `;
-            table.appendChild(headerRow);
-
-            players.forEach(player => {
-                const row = document.createElement('tr');
-                row.className = 'player-row';
-                
-                const pointsValue = player.absent ? '' : player.points;
-                const scratchesValue = player.absent ? '' : player.scratches;
-                const palosValue = player.absent ? '' : player.palos;
-                const acesValue = player.absent ? '' : player.aces;
-
-                row.innerHTML = `
-                    <td style="text-align: left; font-weight: bold;">${player.name}</td>
-                    <td>${pointsValue}</td>
-                    <td>${scratchesValue}</td>
-                    <td>${palosValue}</td>
-                    <td>${acesValue}</td>
-                `;
-                table.appendChild(row);
-            });
-
-            teamDiv.appendChild(header);
-            teamDiv.appendChild(table);
-            return teamDiv;
-        }
-
-        function downloadExcel() {
-            if (!processedData) {
-                showError('No hay datos procesados para descargar');
-                return;
-            }
-
-            try {
-                const workbook = XLSX.utils.book_new();
-                
-                // Preparar datos de equipos
-                const teams = processedData.teamOrder.map(teamName => {
-                    const teamPlayers = processedData.players.filter(p => p.team === teamName);
-                    
-                    // Ordenar jugadores
-                    teamPlayers.sort((a, b) => {
-                        if (a.absent && !b.absent) return 1;
-                        if (!a.absent && b.absent) return -1;
-                        if (a.absent && b.absent) return 0;
-                        return b.points - a.points;
-                    });
-                    
-                    return {
-                        name: teamName,
-                        points: processedData.teams[teamName],
-                        players: teamPlayers,
-                        colors: COLORES_EQUIPOS[teamName] || {bg: '#cccccc', fg: '#000000'}
-                    };
-                });
-
-                // Crear matriz de datos para Excel (equipos lado a lado)
-                const maxPlayers = Math.max(...teams.map(team => team.players.length));
-                const worksheetData = [];
-                
-                // Fila de encabezados
-                const headerRow = [];
-                teams.forEach(team => {
-                    headerRow.push(team.name);
-                    headerRow.push('Puntos');
-                    headerRow.push('Scratches');
-                    headerRow.push('Palos');
-                    headerRow.push('Aces');
-                    if (teams.indexOf(team) < teams.length - 1) {
-                        headerRow.push(''); // Separador entre equipos
-                    }
-                });
-                worksheetData.push(headerRow);
-
-                // Filas de jugadores
-                for (let i = 0; i < maxPlayers; i++) {
-                    const playerRow = [];
-                    teams.forEach(team => {
-                        if (i < team.players.length) {
-                            const player = team.players[i];
-                            const pointsValue = player.absent ? '' : player.points;
-                            const scratchesValue = player.absent ? '' : player.scratches;
-                            const palosValue = player.absent ? '' : player.palos;
-                            const acesValue = player.absent ? '' : player.aces;
-                            
-                            playerRow.push(player.name);
-                            playerRow.push(pointsValue);
-                            playerRow.push(scratchesValue);
-                            playerRow.push(palosValue);
-                            playerRow.push(acesValue);
-                        } else {
-                            // Celdas vacías si el equipo tiene menos jugadores
-                            playerRow.push('', '', '', '', '');
-                        }
-                        
-                        if (teams.indexOf(team) < teams.length - 1) {
-                            playerRow.push(''); // Separador entre equipos
-                        }
-                    });
-                    worksheetData.push(playerRow);
-                }
-
-                const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-                
-                // Aplicar estilos basado en tu código Python
-                const range = XLSX.utils.decode_range(worksheet['!ref']);
-                
-                // Crear estilos para cada equipo basado en COLORES_EQUIPOS
-                let colIndex = 0;
-                teams.forEach((team, teamIndex) => {
-                    const teamColors = team.colors;
-                    
-                    // Aplicar formato a las 5 columnas del equipo (nombre + 4 estadísticas)
-                    for (let col = 0; col < 5; col++) {
-                        const cellRef = XLSX.utils.encode_cell({r: 0, c: colIndex + col});
-                        if (worksheet[cellRef]) {
-                            // Crear formato similar al de tu código Python
-                            worksheet[cellRef].s = {
-                                fill: {
-                                    patternType: "solid",
-                                    fgColor: { rgb: teamColors.bg.replace('#', '') }
-                                },
-                                font: {
-                                    color: { rgb: teamColors.fg.replace('#', '') },
-                                    bold: true,
-                                    sz: 11
-                                },
-                                alignment: {
-                                    horizontal: "center",
-                                    vertical: "center"
-                                },
-                                border: {
-                                    top: { style: "thin", color: { rgb: "000000" } },
-                                    bottom: { style: "thin", color: { rgb: "000000" } },
-                                    left: { style: "thin", color: { rgb: "000000" } },
-                                    right: { style: "thin", color: { rgb: "000000" } }
-                                }
-                            };
-                            
-                            // Para equipos con fondo negro, aplicar borde blanco como en tu código
-                            if (teamColors.bg === "#000000") {
-                                worksheet[cellRef].s.border = {
-                                    top: { style: "thin", color: { rgb: "FFFFFF" } },
-                                    bottom: { style: "thin", color: { rgb: "FFFFFF" } },
-                                    left: { style: "thin", color: { rgb: "FFFFFF" } },
-                                    right: { style: "thin", color: { rgb: "FFFFFF" } }
-                                };
-                            }
-                        }
-                    }
-                    colIndex += (teamIndex < teams.length - 1) ? 6 : 5;
-                });
-                
-                // Aplicar bordes a todas las celdas de datos (filas de jugadores)
-                for (let row = 1; row <= range.e.r; row++) {
-                    for (let col = 0; col <= range.e.c; col++) {
-                        const cellRef = XLSX.utils.encode_cell({r: row, c: col});
-                        if (worksheet[cellRef]) {
-                            worksheet[cellRef].s = {
-                                border: {
-                                    top: { style: "thin", color: { rgb: "000000" } },
-                                    bottom: { style: "thin", color: { rgb: "000000" } },
-                                    left: { style: "thin", color: { rgb: "000000" } },
-                                    right: { style: "thin", color: { rgb: "000000" } }
-                                },
-                                alignment: {
-                                    horizontal: "center",
-                                    vertical: "center"
-                                }
-                            };
-                            
-                            // Para nombres de jugadores (primera columna de cada equipo), alinear a la izquierda
-                            let checkCol = 0;
-                            for (let t = 0; t < teams.length; t++) {
-                                if (col === checkCol) {
-                                    worksheet[cellRef].s.alignment.horizontal = "left";
-                                    worksheet[cellRef].s.font = { bold: true };
-                                    break;
-                                }
-                                checkCol += (t < teams.length - 1) ? 6 : 5;
-                            }
-                        }
-                    }
-                }
-                
-                // Configurar ancho de columnas
-                const colWidths = [];
-                teams.forEach((team, teamIndex) => {
-                    colWidths.push({wch: 15}); // Nombre del jugador
-                    colWidths.push({wch: 8});  // Puntos
-                    colWidths.push({wch: 10}); // Scratches
-                    colWidths.push({wch: 8});  // Palos
-                    colWidths.push({wch: 8});  // Aces
-                    if (teamIndex < teams.length - 1) {
-                        colWidths.push({wch: 2}); // Separador
-                    }
-                });
-                worksheet['!cols'] = colWidths;
-
-                XLSX.utils.book_append_sheet(workbook, worksheet, 'Estadísticas');
-                
-                // Usar configuración similar a tu código Python para escritura
-                const excelBuffer = XLSX.write(workbook, {
-                    bookType: 'xlsx',
-                    type: 'array',
-                    compression: true,
-                    Props: {
-                        Title: "Estadísticas Trivial IRC",
-                        Author: "Trivial IRC Processor"
-                    }
-                });
-                
-                const blob = new Blob([excelBuffer], {
-                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                });
-                
-                // Crear enlace de descarga
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                
-                const cleanFileName = fileName.replace(/\.txt$/, '');
-                link.download = `${cleanFileName}_estadisticas.xlsx`;
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-                
-                showSuccess('Archivo Excel descargado correctamente');
-            } catch (error) {
-                showError('Error al generar el Excel: ' + error.message);
-                console.error('Error completo:', error);
-            }
-        }
-
-        function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error';
-            errorDiv.textContent = message;
-            document.body.appendChild(errorDiv);
-            setTimeout(() => errorDiv.remove(), 5000);
-        }
-
-        function showSuccess(message) {
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success';
-            successDiv.textContent = message;
-            document.body.appendChild(successDiv);
-            setTimeout(() => successDiv.remove(), 3000);
-        }
-    </script>
+    function showSuccess(msg) {
+      const div = document.createElement("div");
+      div.className = "success";
+      div.textContent = msg;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 3000);
+    }
+  </script>
 </body>
 </html>

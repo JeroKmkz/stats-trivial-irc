@@ -568,8 +568,8 @@
       // TABLA 1: PUNTOS (ordenada por avgPoints)
       const pointsData = [...players].sort((a, b) => b.avgPoints - a.avgPoints);
       
-      // Headers para PUNTOS
-      ws.getCell(1, 1).value = "PUNTOS";
+      // Headers para PUNTOS (título centrado en JUG)
+      ws.getCell(1, 3).value = "PUNTOS";
       ws.getCell(2, 2).value = "TOT";
       ws.getCell(2, 3).value = "JUG";
       ws.getCell(2, 4).value = "AVG";
@@ -584,23 +584,22 @@
         nameCell.font = {
           color: { argb: colors.fg.replace("#", "FF") }
         };
-        if (colors.bg !== "#000000") {
-          nameCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: colors.bg.replace("#", "FF") }
-          };
-        }
+        // Aplicar fondo siempre, independientemente del color
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
         
         ws.getCell(row, 2).value = player.totalPoints;
         ws.getCell(row, 3).value = player.gamesPlayed;
-        ws.getCell(row, 4).value = Math.round(player.avgPoints * 10) / 10; // 1 decimal
+        ws.getCell(row, 4).value = parseFloat(player.avgPoints.toFixed(1)); // 1 decimal siempre
       });
 
       // TABLA 2: POSTES (ordenada por avgPalos) - Columna 6
       const palosData = [...players].sort((a, b) => b.avgPalos - a.avgPalos);
       
-      ws.getCell(1, 6).value = "POSTES";
+      ws.getCell(1, 8).value = "POSTES";
       ws.getCell(2, 7).value = "TOT";
       ws.getCell(2, 8).value = "JUG";
       ws.getCell(2, 9).value = "AVG";
@@ -614,23 +613,22 @@
         nameCell.font = {
           color: { argb: colors.fg.replace("#", "FF") }
         };
-        if (colors.bg !== "#000000") {
-          nameCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: colors.bg.replace("#", "FF") }
-          };
-        }
+        // Aplicar fondo siempre, independientemente del color
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
         
         ws.getCell(row, 7).value = player.totalPalos;
         ws.getCell(row, 8).value = player.gamesPlayed;
-        ws.getCell(row, 9).value = Math.round(player.avgPalos * 10) / 10;
+        ws.getCell(row, 9).value = parseFloat(player.avgPalos.toFixed(1)); // 1 decimal siempre
       });
 
       // TABLA 3: SCRATCHES (ordenada por avgScratches) - Columna 11
       const scratchesData = [...players].sort((a, b) => b.avgScratches - a.avgScratches);
       
-      ws.getCell(1, 11).value = "SCRATCHES";
+      ws.getCell(1, 13).value = "SCRATCHES";
       ws.getCell(2, 12).value = "TOT";
       ws.getCell(2, 13).value = "JUG";
       ws.getCell(2, 14).value = "AVG";
@@ -644,23 +642,22 @@
         nameCell.font = {
           color: { argb: colors.fg.replace("#", "FF") }
         };
-        if (colors.bg !== "#000000") {
-          nameCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: colors.bg.replace("#", "FF") }
-          };
-        }
+        // Aplicar fondo siempre, independientemente del color
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
         
         ws.getCell(row, 12).value = player.totalScratches;
         ws.getCell(row, 13).value = player.gamesPlayed;
-        ws.getCell(row, 14).value = Math.round(player.avgScratches * 10) / 10;
+        ws.getCell(row, 14).value = parseFloat(player.avgScratches.toFixed(1)); // 1 decimal siempre
       });
 
       // TABLA 4: ACES (ordenada por avgAces) - Columna 16
       const acesData = [...players].sort((a, b) => b.avgAces - a.avgAces);
       
-      ws.getCell(1, 16).value = "ACES";
+      ws.getCell(1, 18).value = "ACES";
       ws.getCell(2, 17).value = "TOT";
       ws.getCell(2, 18).value = "JUG";
       ws.getCell(2, 19).value = "AVG";
@@ -674,17 +671,16 @@
         nameCell.font = {
           color: { argb: colors.fg.replace("#", "FF") }
         };
-        if (colors.bg !== "#000000") {
-          nameCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: colors.bg.replace("#", "FF") }
-          };
-        }
+        // Aplicar fondo siempre, independientemente del color
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
         
         ws.getCell(row, 17).value = player.totalAces;
         ws.getCell(row, 18).value = player.gamesPlayed;
-        ws.getCell(row, 19).value = Math.round(player.avgAces * 10) / 10;
+        ws.getCell(row, 19).value = parseFloat(player.avgAces.toFixed(1)); // 1 decimal siempre
       });
 
       // Configurar anchos de columna

@@ -218,7 +218,9 @@
           try {
             const arrayBuffer = e.target.result;
             const data = await extractDataFromExcel(arrayBuffer);
-            processedData[index] = data;
+            if (data) {
+              processedData[index] = data;
+            }
             processed++;
 
             if (processed === files.length) {
@@ -327,14 +329,17 @@
       const info = document.createElement('div');
       info.className = 'log-info';
       
-      // Calcular totales generales
+      // Calcular totales generales solo de datos válidos
+      const validData = processedData.filter(data => data !== null && data !== undefined);
       const allPlayers = new Set();
-      let totalMatches = processedData.length;
+      let totalMatches = validData.length;
       
-      processedData.forEach(matchData => {
-        matchData.players.forEach(player => {
-          allPlayers.add(player.name);
-        });
+      validData.forEach(matchData => {
+        if (matchData && matchData.players) {
+          matchData.players.forEach(player => {
+            allPlayers.add(player.name);
+          });
+        }
       });
       
       info.innerHTML = `
@@ -447,116 +452,123 @@
     }
 
     function generateTotalsSheet(ws) {
+      // Filtrar solo datos válidos
+      const validData = processedData.filter(data => data !== null && data !== undefined);
+      
       // Recopilar datos de todos los jugadores de todas las partidas
       const playerTotals = {};
       
-      processedData.forEach(matchData => {
-        matchData.players.forEach(player => {
-          if (!player.absent) {
-            const playerName = player.name;
-            
-            if (!playerTotals[playerName]) {
-              playerTotals[playerName] = {
-                name: playerName,
-                team: player.team,
-                totalPoints: 0,
-                totalPalos: 0,
-                totalScratches: 0,
-                totalAces: 0,
-                gamesPlayed: 0
-              };
+      validData.forEach(matchData => {
+        if (matchData && matchData.players) {
+          matchData.players.forEach(player => {
+            if (!player.absent) {
+              const playerName = player.name;
+              
+              if (!playerTotals[playerName]) {
+                playerTotals[playerName] = {
+                  name: playerName,
+                  team: player.team,
+                  totalPoints: 0,
+                  totalPalos: 0,
+                  totalScratches: 0,
+                  totalAces: 0,
+                  gamesPlayed: 0
+                };
+              }
+              
+              playerTotals[playerName].totalPoints += player.points || 0;
+              playerTotals[playerName].totalPalos += player.palos || 0;
+              playerTotals[playerName].totalScratches += player.scratches || 0;
+              playerTotals[playerName].totalAces += player.aces || 0;
+              playerTotals[playerName].gamesPlayed += 1;
             }
-            
-            playerTotals[playerName].totalPoints += player.points || 0;
-            playerTotals[playerName].totalPalos += player.palos || 0;
-            playerTotals[playerName].totalScratches += player.scratches || 0;
-            playerTotals[playerName].totalAces += player.aces || 0;
-            playerTotals[playerName].gamesPlayed += 1;
-          }
-        });
+          });
+        }
       });
 
       // Recopilar datos de equipos y calcular SCO
       const teamTotals = {};
       
-      processedData.forEach(matchData => {
-        const teams = matchData.teamOrder;
-        
-        // Para SCO de PUNTOS - comparar puntuaciones de equipos
-        let teamsByPoints = teams.map(teamName => ({
-          name: teamName,
-          points: matchData.teams[teamName] || 0
-        })).sort((a, b) => b.points - a.points);
-
-        // Para SCO de SCRATCHES - comparar scratches de equipos  
-        let teamsByScratches = teams.map(teamName => {
-          const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
-          const teamScratches = teamPlayers.reduce((sum, p) => sum + (p.scratches || 0), 0);
-          return {
+      validData.forEach(matchData => {
+        if (matchData && matchData.teamOrder && matchData.teams && matchData.players) {
+          const teams = matchData.teamOrder;
+          
+          // Para SCO de PUNTOS - comparar puntuaciones de equipos
+          let teamsByPoints = teams.map(teamName => ({
             name: teamName,
-            scratches: teamScratches
-          };
-        }).sort((a, b) => b.scratches - a.scratches);
+            points: matchData.teams[teamName] || 0
+          })).sort((a, b) => b.points - a.points);
 
-        teams.forEach(teamName => {
-          if (!teamTotals[teamName]) {
-            teamTotals[teamName] = {
+          // Para SCO de SCRATCHES - comparar scratches de equipos  
+          let teamsByScratches = teams.map(teamName => {
+            const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
+            const teamScratches = teamPlayers.reduce((sum, p) => sum + (p.scratches || 0), 0);
+            return {
               name: teamName,
-              totalPoints: 0,
-              totalPalos: 0,
-              totalScratches: 0,
-              totalAces: 0,
-              totalAsistencia: 0,
-              gamesPlayed: 0,
-              scoPoints: 0,
-              scoScratches: 0
+              scratches: teamScratches
             };
-          }
-          
-          // Sumar puntos del equipo
-          teamTotals[teamName].totalPoints += matchData.teams[teamName] || 0;
-          
-          // Contar jugadores presentes (asistencia) y sumar estadísticas del equipo
-          const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
-          teamTotals[teamName].totalAsistencia += teamPlayers.length;
-          
-          // Sumar estadísticas del equipo
-          teamPlayers.forEach(player => {
-            teamTotals[teamName].totalPalos += player.palos || 0;
-            teamTotals[teamName].totalScratches += player.scratches || 0;
-            teamTotals[teamName].totalAces += player.aces || 0;
+          }).sort((a, b) => b.scratches - a.scratches);
+
+          teams.forEach(teamName => {
+            if (!teamTotals[teamName]) {
+              teamTotals[teamName] = {
+                name: teamName,
+                totalPoints: 0,
+                totalPalos: 0,
+                totalScratches: 0,
+                totalAces: 0,
+                totalAsistencia: 0,
+                gamesPlayed: 0,
+                scoPoints: 0,
+                scoScratches: 0
+              };
+            }
+            
+            // Sumar puntos del equipo
+            teamTotals[teamName].totalPoints += matchData.teams[teamName] || 0;
+            
+            // Contar jugadores presentes (asistencia) y sumar estadísticas del equipo
+            const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
+            teamTotals[teamName].totalAsistencia += teamPlayers.length;
+            
+            // Sumar estadísticas del equipo
+            teamPlayers.forEach(player => {
+              teamTotals[teamName].totalPalos += player.palos || 0;
+              teamTotals[teamName].totalScratches += player.scratches || 0;
+              teamTotals[teamName].totalAces += player.aces || 0;
+            });
+            
+            teamTotals[teamName].gamesPlayed += 1;
+
+            // Calcular SCO para PUNTOS (suponiendo 2 equipos)
+            if (teams.length === 2) {
+              if (teamsByPoints[0].points === teamsByPoints[1].points) {
+                // Empate
+                teamTotals[teamName].scoPoints += 2;
+              } else if (teamsByPoints[0].name === teamName) {
+                // Ganador
+                teamTotals[teamName].scoPoints += 3;
+              } else {
+                // Perdedor
+                teamTotals[teamName].scoPoints += 1;
+              }
+            }
+
+            // Calcular SCO para SCRATCHES (suponiendo 2 equipos)
+            if (teams.length === 2) {
+              if (teamsByScratches[0].scratches === teamsByScratches[1].scratches) {
+                // Empate
+                teamTotals[teamName].scoScratches += 2;
+              } else if (teamsByScratches[0].name === teamName) {
+                // Ganador en scratches
+                teamTotals[teamName].scoScratches += 3;
+              } else {
+                // Perdedor en scratches
+                teamTotals[teamName].scoScratches += 1;
+              }
+            }
           });
-          
-          teamTotals[teamName].gamesPlayed += 1;
-
-          // Calcular SCO para PUNTOS (suponiendo 2 equipos)
-          if (teams.length === 2) {
-            if (teamsByPoints[0].points === teamsByPoints[1].points) {
-              // Empate
-              teamTotals[teamName].scoPoints += 2;
-            } else if (teamsByPoints[0].name === teamName) {
-              // Ganador
-              teamTotals[teamName].scoPoints += 3;
-            } else {
-              // Perdedor
-              teamTotals[teamName].scoPoints += 1;
-            }
-          }
-
-          // Calcular SCO para SCRATCHES (suponiendo 2 equipos)
-          if (teams.length === 2) {
-            if (teamsByScratches[0].scratches === teamsByScratches[1].scratches) {
-              // Empate
-              teamTotals[teamName].scoScratches += 2;
-            } else if (teamsByScratches[0].name === teamName) {
-              // Ganador en scratches
-              teamTotals[teamName].scoScratches += 3;
-            } else {
-              // Perdedor en scratches
-              teamTotals[teamName].scoScratches += 1;
-            }
-          }
-        });
+        }
       });
 
       // Convertir a array y calcular promedios para jugadores

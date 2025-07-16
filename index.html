@@ -872,9 +872,9 @@
         ws.getCell(currentRow, 1).font = { bold: true, size: 13 };
         currentRow++;
 
-        let col = 1;
+        let equiposCol = 1;
         teams.forEach((team, index) => {
-          const nameCell = ws.getCell(currentRow, col);
+          const nameCell = ws.getCell(currentRow, equiposCol);
           nameCell.value = team.name;
           nameCell.font = { 
             color: { argb: team.colors.fg.replace("#", "FF") },
@@ -886,8 +886,8 @@
             fgColor: { argb: team.colors.bg.replace("#", "FF") }
           };
 
-          ws.getCell(currentRow, col + 1).value = team.points;
-          col += (index < teams.length - 1) ? 3 : 2;
+          ws.getCell(currentRow, equiposCol + 1).value = team.points;
+          equiposCol += (index < teams.length - 1) ? 3 : 2;
         });
         currentRow += 2;
 
@@ -980,10 +980,10 @@
         ws.getRow(currentRow + 1).values = teamTotalRow;
 
         // Aplicar formato igual que antes...
-        let col = 1;
+        let formatCol = 1;
         teams.forEach((team, teamIndex) => {
           for (let i = 0; i < 5; i++) {
-            const cell = ws.getCell(currentRow, col + i);
+            const cell = ws.getCell(currentRow, formatCol + i);
             cell.font = { bold: false, size: 13 };
             cell.alignment = { horizontal: "center", vertical: "center" };
             cell.border = {
@@ -991,7 +991,7 @@
               bottom: { style: "thin" }, right: { style: "thin" }
             };
           }
-          col += (teamIndex < teams.length - 1) ? 6 : 5;
+          formatCol += (teamIndex < teams.length - 1) ? 6 : 5;
         });
 
         currentRow += 14;

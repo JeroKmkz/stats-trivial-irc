@@ -875,11 +875,11 @@
         currentRow += 2;
 
         // Aplicar colores a nombres de equipos
-        let col = 1;
+        let equipoCol = 1;
         teams.forEach((team, teamIndex) => {
           const colors = COLORES_EQUIPOS[team.name];
           if (colors) {
-            const nameCell = ws.getCell(currentRow - 2, col);
+            const nameCell = ws.getCell(currentRow - 2, equipoCol);
             nameCell.font = { color: { argb: colors.fg.replace("#", "FF") }, bold: true };
             nameCell.fill = {
               type: "pattern",
@@ -887,7 +887,7 @@
               fgColor: { argb: colors.bg.replace("#", "FF") }
             };
           }
-          col += (teamIndex < teams.length - 1) ? 3 : 2;
+          equipoCol += (teamIndex < teams.length - 1) ? 3 : 2;
         });
 
         // Headers de estadísticas por equipo
@@ -981,10 +981,10 @@
         ws.getRow(currentRow + 1).values = teamTotalRow;
 
         // Aplicar formato a totales
-        let col = 1;
+        let totalCol = 1;
         teams.forEach((team, teamIndex) => {
           for (let i = 0; i < 5; i++) {
-            const cell = ws.getCell(currentRow, col + i);
+            const cell = ws.getCell(currentRow, totalCol + i);
             cell.font = { bold: false, size: 13 };
             cell.alignment = { horizontal: "center", vertical: "center" };
             cell.border = {
@@ -992,7 +992,7 @@
               bottom: { style: "thin" }, right: { style: "thin" }
             };
           }
-          col += (teamIndex < teams.length - 1) ? 6 : 5;
+          totalCol += (teamIndex < teams.length - 1) ? 6 : 5;
         });
 
         currentRow += 14;

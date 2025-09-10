@@ -714,29 +714,11 @@
         });
       });
 
-      // Recopilar datos de equipos y calcular SCO
+      // Recopilar datos de equipos
       const teamTotals = {};
       
       processedData.forEach(matchData => {
-        const teams = matchData.teamOrder;
-        
-        // Para SCO de PUNTOS - comparar puntuaciones de equipos
-        let teamsByPoints = teams.map(teamName => ({
-          name: teamName,
-          points: matchData.teams[teamName] || 0
-        })).sort((a, b) => b.points - a.points);
-
-        // Para SCO de SCRATCHES - comparar scratches de equipos  
-        let teamsByScratches = teams.map(teamName => {
-          const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
-          const teamScratches = teamPlayers.reduce((sum, p) => sum + (p.scratches || 0), 0);
-          return {
-            name: teamName,
-            scratches: teamScratches
-          };
-        }).sort((a, b) => b.scratches - a.scratches);
-
-        teams.forEach(teamName => {
+        matchData.teamOrder.forEach(teamName => {
           if (!teamTotals[teamName]) {
             teamTotals[teamName] = {
               name: teamName,
@@ -745,9 +727,7 @@
               totalScratches: 0,
               totalAces: 0,
               totalAsistencia: 0,
-              gamesPlayed: 0,
-              scoPoints: 0,
-              scoScratches: 0
+              gamesPlayed: 0
             };
           }
           
@@ -766,34 +746,6 @@
           });
           
           teamTotals[teamName].gamesPlayed += 1;
-
-          // Calcular SCO para PUNTOS (suponiendo 2 equipos)
-          if (teams.length === 2) {
-            if (teamsByPoints[0].points === teamsByPoints[1].points) {
-              // Empate
-              teamTotals[teamName].scoPoints += 2;
-            } else if (teamsByPoints[0].name === teamName) {
-              // Ganador
-              teamTotals[teamName].scoPoints += 3;
-            } else {
-              // Perdedor
-              teamTotals[teamName].scoPoints += 1;
-            }
-          }
-
-          // Calcular SCO para SCRATCHES (suponiendo 2 equipos)
-          if (teams.length === 2) {
-            if (teamsByScratches[0].scratches === teamsByScratches[1].scratches) {
-              // Empate
-              teamTotals[teamName].scoScratches += 2;
-            } else if (teamsByScratches[0].name === teamName) {
-              // Ganador en scratches
-              teamTotals[teamName].scoScratches += 3;
-            } else {
-              // Perdedor en scratches
-              teamTotals[teamName].scoScratches += 1;
-            }
-          }
         });
       });
 
@@ -821,10 +773,10 @@
         return COLORES_EQUIPOS[teamName] || { bg: "#000000", fg: "#000000" };
       }
 
-      // =============== TABLAS DE JUGADORES (LIMITADAS A 33) ===============
+      // =============== TABLAS DE JUGADORES ===============
       
-      // TABLA 1: PUNTOS JUGADORES (top 33)
-      const pointsData = [...players].sort((a, b) => b.avgPoints - a.avgPoints).slice(0, 33);
+      // TABLA 1: PUNTOS JUGADORES (ordenada por avgPoints)
+      const pointsData = [...players].sort((a, b) => b.avgPoints - a.avgPoints);
       
       ws.getCell(1, 3).value = "PUNTOS";
       ws.getCell(2, 2).value = "TOT";
@@ -849,8 +801,8 @@
         ws.getCell(row, 4).value = parseFloat(player.avgPoints.toFixed(1));
       });
 
-      // TABLA 2: POSTES JUGADORES (top 33)
-      const palosData = [...players].sort((a, b) => b.avgPalos - a.avgPalos).slice(0, 33);
+      // TABLA 2: POSTES JUGADORES
+      const palosData = [...players].sort((a, b) => b.avgPalos - a.avgPalos);
       
       ws.getCell(1, 8).value = "POSTES";
       ws.getCell(2, 7).value = "TOT";
@@ -875,8 +827,8 @@
         ws.getCell(row, 9).value = parseFloat(player.avgPalos.toFixed(1));
       });
 
-      // TABLA 3: SCRATCHES JUGADORES (top 33)
-      const scratchesData = [...players].sort((a, b) => b.avgScratches - a.avgScratches).slice(0, 33);
+      // TABLA 3: SCRATCHES JUGADORES
+      const scratchesData = [...players].sort((a, b) => b.avgScratches - a.avgScratches);
       
       ws.getCell(1, 13).value = "SCRATCHES";
       ws.getCell(2, 12).value = "TOT";
@@ -901,8 +853,8 @@
         ws.getCell(row, 14).value = parseFloat(player.avgScratches.toFixed(1));
       });
 
-      // TABLA 4: ACES JUGADORES (top 33)
-      const acesData = [...players].sort((a, b) => b.avgAces - a.avgAces).slice(0, 33);
+      // TABLA 4: ACES JUGADORES
+      const acesData = [...players].sort((a, b) => b.avgAces - a.avgAces);
       
       ws.getCell(1, 18).value = "ACES";
       ws.getCell(2, 17).value = "TOT";
@@ -927,23 +879,21 @@
         ws.getCell(row, 19).value = parseFloat(player.avgAces.toFixed(1));
       });
 
-      // =============== TABLAS DE EQUIPOS (EMPIEZAN EN FILA 39: 33 + 3 + 3) ===============
-      const teamStartRow = 39; // 33 jugadores + 3 filas de separación + filas de headers (2)
+      // =============== TABLAS DE EQUIPOS ===============
       
-      // TABLA 5: PUNTOS EQUIPOS con SCO
+      // TABLA 5: PUNTOS EQUIPOS (ordenada por avgPoints) - Columna 23
       const teamPointsData = [...teams].sort((a, b) => b.avgPoints - a.avgPoints);
       
-      ws.getCell(teamStartRow - 1, 4).value = "PUNTOS";
-      ws.getCell(teamStartRow, 2).value = "SCO";
-      ws.getCell(teamStartRow, 3).value = "TOT";
-      ws.getCell(teamStartRow, 4).value = "JUG";
-      ws.getCell(teamStartRow, 5).value = "AVG";
+      ws.getCell(1, 25).value = "PUNTOS";
+      ws.getCell(2, 24).value = "TOT";
+      ws.getCell(2, 25).value = "JUG";
+      ws.getCell(2, 26).value = "AVG";
       
       teamPointsData.forEach((team, index) => {
-        const row = teamStartRow + 1 + index;
+        const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 1);
+        const nameCell = ws.getCell(row, 23);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -952,128 +902,7 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 2).value = team.scoPoints;
-        ws.getCell(row, 3).value = team.totalPoints;
-        ws.getCell(row, 4).value = team.gamesPlayed;
-        ws.getCell(row, 5).value = parseFloat(team.avgPoints.toFixed(1));
-      });
-
-      // TABLA 6: POSTES EQUIPOS
-      const teamPalosData = [...teams].sort((a, b) => b.avgPalos - a.avgPalos);
-      
-      ws.getCell(teamStartRow - 1, 9).value = "POSTES";
-      ws.getCell(teamStartRow, 7).value = "TOT";
-      ws.getCell(teamStartRow, 8).value = "JUG";
-      ws.getCell(teamStartRow, 9).value = "AVG";
-      
-      teamPalosData.forEach((team, index) => {
-        const row = teamStartRow + 1 + index;
-        const colors = getTeamColors(team.name);
-        
-        const nameCell = ws.getCell(row, 6);
-        nameCell.value = team.name;
-        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
-        nameCell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: colors.bg.replace("#", "FF") }
-        };
-        
-        ws.getCell(row, 7).value = team.totalPalos;
-        ws.getCell(row, 8).value = team.gamesPlayed;
-        ws.getCell(row, 9).value = parseFloat(team.avgPalos.toFixed(1));
-      });
-
-      // TABLA 7: SCRATCHES EQUIPOS con SCO
-      const teamScratchesData = [...teams].sort((a, b) => b.avgScratches - a.avgScratches);
-      
-      ws.getCell(teamStartRow - 1, 13).value = "SCRATCHES";
-      ws.getCell(teamStartRow, 11).value = "SCO";
-      ws.getCell(teamStartRow, 12).value = "TOT";
-      ws.getCell(teamStartRow, 13).value = "JUG";
-      ws.getCell(teamStartRow, 14).value = "AVG";
-      
-      teamScratchesData.forEach((team, index) => {
-        const row = teamStartRow + 1 + index;
-        const colors = getTeamColors(team.name);
-        
-        const nameCell = ws.getCell(row, 10);
-        nameCell.value = team.name;
-        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
-        nameCell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: colors.bg.replace("#", "FF") }
-        };
-        
-        ws.getCell(row, 11).value = team.scoScratches;
-        ws.getCell(row, 12).value = team.totalScratches;
-        ws.getCell(row, 13).value = team.gamesPlayed;
-        ws.getCell(row, 14).value = parseFloat(team.avgScratches.toFixed(1));
-      });
-
-      // TABLA 8: ACES EQUIPOS
-      const teamAcesData = [...teams].sort((a, b) => b.avgAces - a.avgAces);
-      
-      ws.getCell(teamStartRow - 1, 18).value = "ACES";
-      ws.getCell(teamStartRow, 16).value = "TOT";
-      ws.getCell(teamStartRow, 17).value = "JUG";
-      ws.getCell(teamStartRow, 18).value = "AVG";
-      
-      teamAcesData.forEach((team, index) => {
-        const row = teamStartRow + 1 + index;
-        const colors = getTeamColors(team.name);
-        
-        const nameCell = ws.getCell(row, 15);
-        nameCell.value = team.name;
-        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
-        nameCell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: colors.bg.replace("#", "FF") }
-        };
-        
-        ws.getCell(row, 16).value = team.totalAces;
-        ws.getCell(row, 17).value = team.gamesPlayed;
-        ws.getCell(row, 18).value = parseFloat(team.avgAces.toFixed(1));
-      });
-
-      // TABLA 9: ASISTENCIA EQUIPOS
-      const teamAsistenciaData = [...teams].sort((a, b) => b.avgAsistencia - a.avgAsistencia);
-      
-      ws.getCell(teamStartRow - 1, 22).value = "ASISTENCIA";
-      ws.getCell(teamStartRow, 20).value = "TOT";
-      ws.getCell(teamStartRow, 21).value = "JUG";
-      ws.getCell(teamStartRow, 22).value = "AVG";
-      
-      teamAsistenciaData.forEach((team, index) => {
-        const row = teamStartRow + 1 + index;
-        const colors = getTeamColors(team.name);
-        
-        const nameCell = ws.getCell(row, 19);
-        nameCell.value = team.name;
-        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
-        nameCell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: colors.bg.replace("#", "FF") }
-        };
-        
-        ws.getCell(row, 20).value = team.totalAsistencia;
-        ws.getCell(row, 21).value = team.gamesPlayed;
-        ws.getCell(row, 22).value = parseFloat(team.avgAsistencia.toFixed(1));
-      });
-
-      // Configurar anchos de columna
-      ws.columns = [
-        // Jugadores
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // PUNTOS + separador
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // POSTES + separador
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // SCRATCHES + separador
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // ACES + separador
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }              // ASISTENCIA
-      ];
-    }, 24).value = team.totalPoints;
+        ws.getCell(row, 24).value = team.totalPoints;
         ws.getCell(row, 25).value = team.gamesPlayed;
         ws.getCell(row, 26).value = parseFloat(team.avgPoints.toFixed(1));
       });

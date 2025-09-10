@@ -193,128 +193,124 @@
             if (processed === files.length) {
               displayResults(processedData);
               document.getElementById('downloadSection').style.display = 'block';
-              showSuccess(`${files.length} archivo${files.length > 1 ? 's' : ''} procesado${files.length > 1 ? 's' : ''} correctamente`);
             }
-          } catch (err) {
-            console.error(err);
-            showError(`Error procesando ${file.name}: ${err.message}`);
+          } catch (error) {
+            showError(`Error al procesar ${file.name}: ${error.message}`);
           }
         };
         reader.readAsText(file);
       });
     }
 
-    // PROCESO 2: Totales Liga (solo archivos .xlsx)
-    function processTotales() {
+    // PROCESO 2: Totales Liga (archivos Excel .xlsx)
+    async function processTotales() {
       const files = document.getElementById('fileInputTotales').files;
       if (!files || files.length === 0) return showError("Selecciona al menos un archivo Excel");
 
-      processedData = [];
-      let processed = 0;
-
-      Array.from(files).forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-          try {
-            const arrayBuffer = e.target.result;
-            const data = await extractDataFromExcel(arrayBuffer);
-            if (data) {
-              processedData[index] = data;
-            }
-            processed++;
-
-            if (processed === files.length) {
-              displayTotalesOnlyResults();
-              document.getElementById('downloadSection').style.display = 'block';
-              showSuccess(`${files.length} archivo${files.length > 1 ? 's' : ''} de jornada procesado${files.length > 1 ? 's' : ''} correctamente`);
-            }
-          } catch (err) {
-            console.error(err);
-            showError(`Error procesando ${file.name}: ${err.message}`);
+      try {
+        processedData = [];
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const buffer = await file.arrayBuffer();
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer);
+          
+          // Leer la hoja "Estadísticas"
+          const worksheet = workbook.getWorksheet("Estadísticas");
+          if (!worksheet) {
+            showError(`El archivo ${file.name} no tiene una hoja "Estadísticas"`);
+            return;
           }
-        };
-        reader.readAsArrayBuffer(file);
-      });
+          
+          // Extraer datos del Excel y convertir al formato esperado
+          const matchData = extractDataFromExcel(worksheet);
+          processedData.push(...matchData);
+        }
+        
+        if (processedData.length > 0) {
+          displayTotalesOnlyResults();
+          document.getElementById('downloadSection').style.display = 'block';
+        }
+        
+      } catch (error) {
+        showError(`Error procesando archivos Excel: ${error.message}`);
+      }
     }
 
-    async function extractDataFromExcel(arrayBuffer) {
-      try {
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(arrayBuffer);
+    function extractDataFromExcel(worksheet) {
+      // Esta función extrae los datos del Excel y los convierte al formato que necesita processedData
+      const matches = [];
+      let currentRow = 1;
+      
+      // Buscar todas las "partidas" en el Excel
+      while (currentRow <= worksheet.rowCount) {
+        const row = worksheet.getRow(currentRow);
         
-        const worksheet = workbook.getWorksheet('Estadísticas');
-        if (!worksheet) throw new Error("No se encontró la hoja 'Estadísticas'");
+        // Buscar inicio de una nueva partida (fila con headers como "Puntos", "Scratches", etc.)
+        if (row.getCell(2).value === "Puntos" && row.getCell(3).value === "Scratches") {
+          const matchData = extractSingleMatch(worksheet, currentRow);
+          if (matchData) {
+            matches.push(matchData);
+          }
+          currentRow += 14; // Saltar al siguiente bloque
+        } else {
+          currentRow++;
+        }
+      }
+      
+      return matches;
+    }
 
-        const teams = [];
+    function extractSingleMatch(worksheet, startRow) {
+      try {
+        const teamRow = worksheet.getRow(startRow + 1);
+        const teams = {};
+        const teamOrder = [];
         const players = [];
-        let currentTeam = null;
-
-        worksheet.eachRow((row, rowIndex) => {
-          const values = row.values;
-          if (!values || values.length < 2) return;
-
-          const firstCell = values[1];
-          if (!firstCell) return;
-
-          const cellValue = typeof firstCell === 'object' ? firstCell.text || firstCell.result || '' : firstCell.toString();
+        
+        // Extraer equipos y sus puntuaciones
+        let col = 1;
+        while (col <= teamRow.cellCount) {
+          const teamName = teamRow.getCell(col).value;
+          const teamPoints = teamRow.getCell(col + 1).value;
           
-          if (cellValue.includes('CLASIFICACION EQUIPOS')) {
-            // Siguiente fila debería contener los datos de equipos
-            const nextRow = worksheet.getRow(rowIndex + 1);
-            const teamNames = [];
-            const teamPoints = [];
+          if (teamName && typeof teamName === 'string' && teamPoints && typeof teamPoints === 'number') {
+            teams[teamName] = teamPoints;
+            teamOrder.push(teamName);
             
-            nextRow.eachCell((cell, colIndex) => {
-              if (colIndex % 2 === 1) { // Columnas impares: nombres de equipos
-                teamNames.push(cell.text || cell.value || '');
-              } else { // Columnas pares: puntos de equipos
-                teamPoints.push(parseInt(cell.text || cell.value || 0));
-              }
-            });
-
-            for (let i = 0; i < teamNames.length; i++) {
-              if (teamNames[i] && teamPoints[i] !== undefined) {
-                teams.push({
-                  name: teamNames[i],
-                  points: teamPoints[i],
-                  players: []
+            // Extraer jugadores de este equipo
+            for (let playerRow = startRow + 2; playerRow < startRow + 12; playerRow++) {
+              const row = worksheet.getRow(playerRow);
+              const playerName = row.getCell(col).value;
+              const playerPoints = row.getCell(col + 1).value;
+              const playerScratches = row.getCell(col + 2).value;
+              const playerPalos = row.getCell(col + 3).value;
+              const playerAces = row.getCell(col + 4).value;
+              
+              if (playerName && typeof playerName === 'string') {
+                players.push({
+                  name: playerName.toUpperCase(),
+                  team: teamName,
+                  points: playerPoints || 0,
+                  scratches: playerScratches || 0,
+                  palos: playerPalos || 0,
+                  aces: playerAces || 0,
+                  absent: false
                 });
               }
             }
-          } else if (Object.keys(COLORES_EQUIPOS).some(team => cellValue.includes(team))) {
-            // Es un header de equipo
-            currentTeam = Object.keys(COLORES_EQUIPOS).find(team => cellValue.includes(team));
-          } else if (currentTeam && cellValue && !cellValue.includes('Nombre') && !cellValue.includes('Puntos')) {
-            // Es un jugador
-            const playerData = {
-              name: cellValue.toUpperCase(),
-              team: currentTeam,
-              points: parseInt(values[2] || 0),
-              scratches: parseInt(values[3] || 0),
-              palos: parseInt(values[4] || 0),
-              aces: parseInt(values[5] || 0),
-              absent: cellValue.includes('NO ESTUVO PRESENTE')
-            };
-            players.push(playerData);
             
-            // Encontrar el equipo y añadir el jugador
-            const team = teams.find(t => t.name === currentTeam);
-            if (team) {
-              team.players.push(playerData);
-            }
+            col += 6; // Saltar al siguiente equipo (5 columnas + 1 separador)
+          } else {
+            break;
           }
-        });
-
-        const teamOrder = teams.map(t => t.name);
-        const teamsObj = {};
-        teams.forEach(team => {
-          teamsObj[team.name] = team.points;
-        });
-
+        }
+        
         return {
-          teams: teamsObj,
-          teamOrder: teamOrder,
-          players: players
+          teams,
+          teamOrder,
+          players
         };
       } catch (error) {
         console.error("Error extrayendo datos de partido:", error);
@@ -329,17 +325,14 @@
       const info = document.createElement('div');
       info.className = 'log-info';
       
-      // Calcular totales generales solo de datos válidos
-      const validData = processedData.filter(data => data !== null && data !== undefined);
+      // Calcular totales generales
       const allPlayers = new Set();
-      let totalMatches = validData.length;
+      let totalMatches = processedData.length;
       
-      validData.forEach(matchData => {
-        if (matchData && matchData.players) {
-          matchData.players.forEach(player => {
-            allPlayers.add(player.name);
-          });
-        }
+      processedData.forEach(matchData => {
+        matchData.players.forEach(player => {
+          allPlayers.add(player.name);
+        });
       });
       
       info.innerHTML = `
@@ -351,6 +344,7 @@
       `;
       resultsDiv.appendChild(info);
       resultsDiv.style.display = 'block';
+      showSuccess(`${fileNames.length} archivo${fileNames.length > 1 ? 's' : ''} de jornada procesado${fileNames.length > 1 ? 's' : ''} correctamente`);
     }
 
     function parseLogFile(content) {
@@ -376,52 +370,291 @@
         const points = parseInt(parts[1]);
         const player = {
           name: name.toUpperCase(),
-          points: line.includes('NO ESTUVO PRESENTE') ? 0 : points,
-          absent: line.includes('NO ESTUVO PRESENTE'),
-          scratches: parseInt(parts[2] || 0),
-          palos: parseInt(parts[3] || 0),
-          aces: parseInt(parts[4] || 0),
-          team: ''
+          points: line.includes('NO ESTUVO PRESENTE') ? null : points,
+          aces: parseInt((line.match(/Aces:\s*(\d+)/) || [0, 0])[1]),
+          scratches: parseInt((line.match(/Scr:\s*(\d+)/) || [0, 0])[1]),
+          palos: parseInt((line.match(/Palos:\s*(\d+)/) || [0, 0])[1]),
+          absent: line.includes('NO ESTUVO PRESENTE')
         };
-
-        for (const teamName of Object.keys(COLORES_EQUIPOS)) {
-          if (line.toLowerCase().includes(teamName.toLowerCase())) {
-            player.team = teamName;
-            break;
-          }
-        }
         players.push(player);
       }
 
-      return { teams, teamOrder, players };
+      const teamNames = Object.keys(teams).sort();
+      let index = 0, lastInitial = '';
+      players.forEach(p => {
+        const initial = p.name.charAt(0).toUpperCase();
+        if (initial < lastInitial) index++;
+        p.team = teamNames[index] || 'SinEquipo';
+        lastInitial = initial;
+      });
+
+      return {
+        teams,
+        teamOrder: teamOrder.sort((a,b) => teams[b]-teams[a]),
+        players
+      };
     }
 
-    function displayResults(data) {
+    function displayResults(allData) {
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '';
+      
+      const info = document.createElement('div');
+      info.className = 'log-info';
+      
+      let totalTeams = 0;
+      let totalPlayers = 0;
+      
+      allData.forEach(data => {
+        totalTeams += data.teamOrder.length;
+        totalPlayers += data.players.length;
+      });
+      
+      info.innerHTML = `
+        <h3>📊 Información de los Logs</h3>
+        <p><strong>Partidas procesadas:</strong> ${allData.length}</p>
+        <p><strong>Total de equipos:</strong> ${totalTeams}</p>
+        <p><strong>Total de jugadores:</strong> ${totalPlayers}</p>
+      `;
+      resultsDiv.appendChild(info);
 
-      data.forEach((matchData, index) => {
+      allData.forEach((data, matchIndex) => {
         const matchDiv = document.createElement('div');
-        matchDiv.className = 'log-info';
-        matchDiv.innerHTML = `
-          <h3>📄 ${fileNames[index]}</h3>
-          <p><strong>Equipos:</strong> ${matchData.teamOrder.join(' vs ')}</p>
-          <p><strong>Jugadores:</strong> ${matchData.players.filter(p => !p.absent).length} presentes, ${matchData.players.filter(p => p.absent).length} ausentes</p>
-        `;
+        matchDiv.style.marginBottom = '40px';
+        matchDiv.style.border = '2px solid #ddd';
+        matchDiv.style.borderRadius = '8px';
+        matchDiv.style.padding = '20px';
+        
+        const matchTitle = document.createElement('h3');
+        matchTitle.textContent = `Partida ${matchIndex + 1}`;
+        matchTitle.style.textAlign = 'center';
+        matchTitle.style.marginBottom = '20px';
+        matchDiv.appendChild(matchTitle);
+
+        data.teamOrder.forEach(team => {
+          const players = data.players.filter(p => p.team === team);
+          players.sort((a,b) => {
+            if (a.absent && !b.absent) return 1;
+            if (!a.absent && b.absent) return -1;
+            return (b.points || 0) - (a.points || 0);
+          });
+
+          const teamDiv = document.createElement('div');
+          teamDiv.className = 'team-section';
+          const colors = COLORES_EQUIPOS[team] || { bg: "#ccc", fg: "#000" };
+          const header = document.createElement('div');
+          header.className = 'team-header';
+          header.style.backgroundColor = colors.bg;
+          header.style.color = colors.fg;
+          header.textContent = `${team} - ${data.teams[team]} puntos`;
+          teamDiv.appendChild(header);
+
+          const table = document.createElement('table');
+          table.className = 'stats-table';
+          table.innerHTML = `
+            <tr>
+              <th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Aces</th>
+            </tr>
+          `;
+          players.forEach(p => {
+            const row = document.createElement('tr');
+            row.className = 'player-row';
+            row.innerHTML = `
+              <td style="text-align: left; font-weight: bold;">${p.name}</td>
+              <td>${p.absent ? '' : p.points}</td>
+              <td>${p.absent ? '' : p.scratches}</td>
+              <td>${p.absent ? '' : p.palos}</td>
+              <td>${p.absent ? '' : p.aces}</td>
+            `;
+            table.appendChild(row);
+          });
+
+          teamDiv.appendChild(table);
+          matchDiv.appendChild(teamDiv);
+        });
+        
         resultsDiv.appendChild(matchDiv);
       });
 
       resultsDiv.style.display = 'block';
+      showSuccess(`${allData.length} partida${allData.length > 1 ? 's' : ''} procesada${allData.length > 1 ? 's' : ''} correctamente`);
     }
 
     async function downloadExcel() {
+      if (!processedData || processedData.length === 0) return showError("No hay datos procesados");
+      
       try {
         const wb = new ExcelJS.Workbook();
-
+        
         if (currentProcess === 'jornada') {
-          // PROCESO 1: Solo hoja "Estadísticas"
+          // PROCESO 1: Solo hoja "Estadísticas" (SIN totales)
           const ws = wb.addWorksheet("Estadísticas");
-          generateJornadaSheet(ws);
+          let currentRow = 1;
+
+          processedData.forEach((matchData, matchIndex) => {
+            const teams = matchData.teamOrder.map(teamName => {
+              const players = matchData.players.filter(p => p.team === teamName);
+              players.sort((a,b) => {
+                if (a.absent && !b.absent) return 1;
+                if (!a.absent && b.absent) return -1;
+                return (b.points || 0) - (a.points || 0);
+              });
+              return {
+                name: teamName,
+                points: matchData.teams[teamName],
+                players,
+                colors: COLORES_EQUIPOS[teamName] || { bg: "#CCCCCC", fg: "#000000" }
+              };
+            });
+
+            // [Resto del código de generación de estadísticas igual que antes...]
+            const teamTotals = teams.map(team => {
+              const totals = { scratches: 0, palos: 0, aces: 0 };
+              team.players.forEach(player => {
+                if (!player.absent) {
+                  totals.scratches += player.scratches;
+                  totals.palos += player.palos;
+                  totals.aces += player.aces;
+                }
+              });
+              return totals;
+            });
+
+            // Generar filas igual que antes
+            const generalHeaderRow = [];
+            teams.forEach((team, index) => {
+              generalHeaderRow.push('');
+              generalHeaderRow.push("Puntos");
+              generalHeaderRow.push("Scratches");  
+              generalHeaderRow.push("Palos");
+              generalHeaderRow.push("Aces");
+              if (index < teams.length - 1) generalHeaderRow.push('');
+            });
+            ws.getRow(currentRow).values = generalHeaderRow;
+
+            const teamTotalRow = [];
+            teams.forEach((team, index) => {
+              teamTotalRow.push(team.name);
+              teamTotalRow.push(team.points);
+              teamTotalRow.push(teamTotals[index].scratches);
+              teamTotalRow.push(teamTotals[index].palos);
+              teamTotalRow.push(teamTotals[index].aces);
+              if (index < teams.length - 1) teamTotalRow.push('');
+            });
+            ws.getRow(currentRow + 1).values = teamTotalRow;
+
+            // Aplicar formato igual que antes...
+            let col = 1;
+            teams.forEach((team, teamIndex) => {
+              for (let i = 0; i < 5; i++) {
+                const cell = ws.getCell(currentRow, col + i);
+                cell.font = { bold: false, size: 13 };
+                cell.alignment = { horizontal: "center", vertical: "center" };
+                cell.border = {
+                  top: { style: "thin" }, left: { style: "thin" },
+                  bottom: { style: "thin" }, right: { style: "thin" }
+                };
+              }
+              col += (teamIndex < teams.length - 1) ? 6 : 5;
+            });
+
+            col = 1;
+            teams.forEach((team, teamIndex) => {
+              for (let i = 0; i < 5; i++) {
+                const cell = ws.getCell(currentRow + 1, col + i);
+                
+                if (i === 0) {
+                  cell.fill = {
+                    type: "pattern",
+                    pattern: "solid",
+                    fgColor: { argb: team.colors.bg.replace("#", "FF") }
+                  };
+                  cell.font = {
+                    color: { argb: team.colors.fg.replace("#", "FF") },
+                    bold: true,
+                    size: 14
+                  };
+                } else if (i === 1) {
+                  cell.font = { bold: true, size: 12 };
+                } else {
+                  cell.font = { bold: false, size: 12 };
+                }
+                
+                cell.alignment = { horizontal: "center", vertical: "center" };
+                cell.border = {
+                  top: { style: "thin" }, left: { style: "thin" },
+                  bottom: { style: "thin" }, right: { style: "thin" }
+                };
+              }
+              col += (teamIndex < teams.length - 1) ? 6 : 5;
+            });
+
+            // Jugadores
+            for (let i = 0; i < 10; i++) {
+              const playerRowNumber = currentRow + 2 + i;
+              const hasPlayerInRow = teams.some(team => i < team.players.length);
+              
+              if (hasPlayerInRow) {
+                const row = [];
+                teams.forEach((team, teamIndex) => {
+                  const player = team.players[i];
+                  if (player) {
+                    row.push(
+                      player.name, 
+                      player.absent ? '' : player.points, 
+                      player.absent ? '' : player.scratches, 
+                      player.absent ? '' : player.palos, 
+                      player.absent ? '' : player.aces
+                    );
+                  } else {
+                    row.push('', '', '', '', '');
+                  }
+                  if (teamIndex < teams.length - 1) row.push('');
+                });
+                ws.getRow(playerRowNumber).values = row;
+
+                col = 1;
+                teams.forEach((team, teamIndex) => {
+                  const player = team.players[i];
+                  if (player) {
+                    for (let j = 0; j < 5; j++) {
+                      const cell = ws.getCell(playerRowNumber, col + j);
+                      cell.border = {
+                        top: { style: "thin" }, left: { style: "thin" },
+                        bottom: { style: "thin" }, right: { style: "thin" }
+                      };
+                      
+                      if (j === 0) {
+                        cell.alignment = { horizontal: "left", vertical: "center" };
+                        cell.font = { bold: false };
+                      } else {
+                        cell.alignment = { horizontal: "center", vertical: "center" };
+                      }
+                    }
+                  }
+                  col += (teamIndex < teams.length - 1) ? 6 : 5;
+                });
+              }
+            }
+
+            currentRow += 14;
+          });
+
+          // Configurar anchos
+          if (processedData.length > 0) {
+            const firstMatchTeams = processedData[0].teamOrder.length;
+            const colWidths = [];
+            for (let teamIndex = 0; teamIndex < firstMatchTeams; teamIndex++) {
+              colWidths.push(15);
+              colWidths.push(8);
+              colWidths.push(10);
+              colWidths.push(8);
+              colWidths.push(8);
+              if (teamIndex < firstMatchTeams - 1) colWidths.push(6);
+            }
+            ws.columns = colWidths.map(width => ({ width }));
+          }
+
         } else if (currentProcess === 'totales') {
           // PROCESO 2: Solo hoja "Totales"
           const totalsWs = wb.addWorksheet("Totales");
@@ -452,123 +685,116 @@
     }
 
     function generateTotalsSheet(ws) {
-      // Filtrar solo datos válidos
-      const validData = processedData.filter(data => data !== null && data !== undefined);
-      
       // Recopilar datos de todos los jugadores de todas las partidas
       const playerTotals = {};
       
-      validData.forEach(matchData => {
-        if (matchData && matchData.players) {
-          matchData.players.forEach(player => {
-            if (!player.absent) {
-              const playerName = player.name;
-              
-              if (!playerTotals[playerName]) {
-                playerTotals[playerName] = {
-                  name: playerName,
-                  team: player.team,
-                  totalPoints: 0,
-                  totalPalos: 0,
-                  totalScratches: 0,
-                  totalAces: 0,
-                  gamesPlayed: 0
-                };
-              }
-              
-              playerTotals[playerName].totalPoints += player.points || 0;
-              playerTotals[playerName].totalPalos += player.palos || 0;
-              playerTotals[playerName].totalScratches += player.scratches || 0;
-              playerTotals[playerName].totalAces += player.aces || 0;
-              playerTotals[playerName].gamesPlayed += 1;
+      processedData.forEach(matchData => {
+        matchData.players.forEach(player => {
+          if (!player.absent) {
+            const playerName = player.name;
+            
+            if (!playerTotals[playerName]) {
+              playerTotals[playerName] = {
+                name: playerName,
+                team: player.team,
+                totalPoints: 0,
+                totalPalos: 0,
+                totalScratches: 0,
+                totalAces: 0,
+                gamesPlayed: 0
+              };
             }
-          });
-        }
+            
+            playerTotals[playerName].totalPoints += player.points || 0;
+            playerTotals[playerName].totalPalos += player.palos || 0;
+            playerTotals[playerName].totalScratches += player.scratches || 0;
+            playerTotals[playerName].totalAces += player.aces || 0;
+            playerTotals[playerName].gamesPlayed += 1;
+          }
+        });
       });
 
       // Recopilar datos de equipos y calcular SCO
       const teamTotals = {};
       
-      validData.forEach(matchData => {
-        if (matchData && matchData.teamOrder && matchData.teams && matchData.players) {
-          const teams = matchData.teamOrder;
-          
-          // Para SCO de PUNTOS - comparar puntuaciones de equipos
-          let teamsByPoints = teams.map(teamName => ({
+      processedData.forEach(matchData => {
+        const teams = matchData.teamOrder;
+        
+        // Para SCO de PUNTOS - comparar puntuaciones de equipos
+        let teamsByPoints = teams.map(teamName => ({
+          name: teamName,
+          points: matchData.teams[teamName] || 0
+        })).sort((a, b) => b.points - a.points);
+
+        // Para SCO de SCRATCHES - comparar scratches de equipos  
+        let teamsByScratches = teams.map(teamName => {
+          const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
+          const teamScratches = teamPlayers.reduce((sum, p) => sum + (p.scratches || 0), 0);
+          return {
             name: teamName,
-            points: matchData.teams[teamName] || 0
-          })).sort((a, b) => b.points - a.points);
+            scratches: teamScratches
+          };
+        }).sort((a, b) => b.scratches - a.scratches);
 
-          // Para SCO de SCRATCHES - comparar scratches de equipos  
-          let teamsByScratches = teams.map(teamName => {
-            const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
-            const teamScratches = teamPlayers.reduce((sum, p) => sum + (p.scratches || 0), 0);
-            return {
+        teams.forEach(teamName => {
+          if (!teamTotals[teamName]) {
+            teamTotals[teamName] = {
               name: teamName,
-              scratches: teamScratches
+              totalPoints: 0,
+              totalPalos: 0,
+              totalScratches: 0,
+              totalAces: 0,
+              totalAsistencia: 0,
+              gamesPlayed: 0,
+              scoPoints: 0,
+              scoScratches: 0
             };
-          }).sort((a, b) => b.scratches - a.scratches);
-
-          teams.forEach(teamName => {
-            if (!teamTotals[teamName]) {
-              teamTotals[teamName] = {
-                name: teamName,
-                totalPoints: 0,
-                totalPalos: 0,
-                totalScratches: 0,
-                totalAces: 0,
-                totalAsistencia: 0,
-                gamesPlayed: 0,
-                scoPoints: 0,
-                scoScratches: 0
-              };
-            }
-            
-            // Sumar puntos del equipo
-            teamTotals[teamName].totalPoints += matchData.teams[teamName] || 0;
-            
-            // Contar jugadores presentes (asistencia) y sumar estadísticas del equipo
-            const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
-            teamTotals[teamName].totalAsistencia += teamPlayers.length;
-            
-            // Sumar estadísticas del equipo
-            teamPlayers.forEach(player => {
-              teamTotals[teamName].totalPalos += player.palos || 0;
-              teamTotals[teamName].totalScratches += player.scratches || 0;
-              teamTotals[teamName].totalAces += player.aces || 0;
-            });
-            
-            teamTotals[teamName].gamesPlayed += 1;
-
-            // Calcular SCO para PUNTOS (suponiendo 2 equipos)
-            if (teams.length === 2) {
-              if (teamsByPoints[0].points === teamsByPoints[1].points) {
-                // Empate
-                teamTotals[teamName].scoPoints += 2;
-              } else if (teamsByPoints[0].name === teamName) {
-                // Ganador
-                teamTotals[teamName].scoPoints += 3;
-              } else {
-                // Perdedor
-                teamTotals[teamName].scoPoints += 1;
-              }
-            }
-
-            // Calcular SCO para SCRATCHES (suponiendo 2 equipos)
-            if (teams.length === 2) {
-              if (teamsByScratches[0].scratches === teamsByScratches[1].scratches) {
-                // Empate
-                teamTotals[teamName].scoScratches += 2;
-              } else if (teamsByScratches[0].name === teamName) {
-                // Ganador en scratches
-                teamTotals[teamName].scoScratches += 3;
-              } else {
-                // Perdedor en scratches
-                teamTotals[teamName].scoScratches += 1;
-              }
-            }
+          }
+          
+          // Sumar puntos del equipo
+          teamTotals[teamName].totalPoints += matchData.teams[teamName] || 0;
+          
+          // Contar jugadores presentes (asistencia) y sumar estadísticas del equipo
+          const teamPlayers = matchData.players.filter(p => p.team === teamName && !p.absent);
+          teamTotals[teamName].totalAsistencia += teamPlayers.length;
+          
+          // Sumar estadísticas del equipo
+          teamPlayers.forEach(player => {
+            teamTotals[teamName].totalPalos += player.palos || 0;
+            teamTotals[teamName].totalScratches += player.scratches || 0;
+            teamTotals[teamName].totalAces += player.aces || 0;
           });
-        }
+          
+          teamTotals[teamName].gamesPlayed += 1;
+
+          // Calcular SCO para PUNTOS (suponiendo 2 equipos)
+          if (teams.length === 2) {
+            if (teamsByPoints[0].points === teamsByPoints[1].points) {
+              // Empate
+              teamTotals[teamName].scoPoints += 2;
+            } else if (teamsByPoints[0].name === teamName) {
+              // Ganador
+              teamTotals[teamName].scoPoints += 3;
+            } else {
+              // Perdedor
+              teamTotals[teamName].scoPoints += 1;
+            }
+          }
+
+          // Calcular SCO para SCRATCHES (suponiendo 2 equipos)
+          if (teams.length === 2) {
+            if (teamsByScratches[0].scratches === teamsByScratches[1].scratches) {
+              // Empate
+              teamTotals[teamName].scoScratches += 2;
+            } else if (teamsByScratches[0].name === teamName) {
+              // Ganador en scratches
+              teamTotals[teamName].scoScratches += 3;
+            } else {
+              // Perdedor en scratches
+              teamTotals[teamName].scoScratches += 1;
+            }
+          }
+        });
       });
 
       // Convertir a array y calcular promedios para jugadores
@@ -838,6 +1064,124 @@
         ws.getCell(row, 22).value = parseFloat(team.avgAsistencia.toFixed(1));
       });
 
+      // Configurar anchos de columna
+      ws.columns = [
+        // Jugadores
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // PUNTOS + separador
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // POSTES + separador
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // SCRATCHES + separador
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // ACES + separador
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }              // ASISTENCIA
+      ];
+    }, 24).value = team.totalPoints;
+        ws.getCell(row, 25).value = team.gamesPlayed;
+        ws.getCell(row, 26).value = parseFloat(team.avgPoints.toFixed(1));
+      });
+
+      // TABLA 6: POSTES EQUIPOS - Columna 28
+      const teamPalosData = [...teams].sort((a, b) => b.avgPalos - a.avgPalos);
+      
+      ws.getCell(1, 30).value = "POSTES";
+      ws.getCell(2, 29).value = "TOT";
+      ws.getCell(2, 30).value = "JUG";
+      ws.getCell(2, 31).value = "AVG";
+      
+      teamPalosData.forEach((team, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(team.name);
+        
+        const nameCell = ws.getCell(row, 28);
+        nameCell.value = team.name;
+        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
+        
+        ws.getCell(row, 29).value = team.totalPalos;
+        ws.getCell(row, 30).value = team.gamesPlayed;
+        ws.getCell(row, 31).value = parseFloat(team.avgPalos.toFixed(1));
+      });
+
+      // TABLA 7: SCRATCHES EQUIPOS - Columna 33
+      const teamScratchesData = [...teams].sort((a, b) => b.avgScratches - a.avgScratches);
+      
+      ws.getCell(1, 35).value = "SCRATCHES";
+      ws.getCell(2, 34).value = "TOT";
+      ws.getCell(2, 35).value = "JUG";
+      ws.getCell(2, 36).value = "AVG";
+      
+      teamScratchesData.forEach((team, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(team.name);
+        
+        const nameCell = ws.getCell(row, 33);
+        nameCell.value = team.name;
+        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
+        
+        ws.getCell(row, 34).value = team.totalScratches;
+        ws.getCell(row, 35).value = team.gamesPlayed;
+        ws.getCell(row, 36).value = parseFloat(team.avgScratches.toFixed(1));
+      });
+
+      // TABLA 8: ACES EQUIPOS - Columna 38
+      const teamAcesData = [...teams].sort((a, b) => b.avgAces - a.avgAces);
+      
+      ws.getCell(1, 40).value = "ACES";
+      ws.getCell(2, 39).value = "TOT";
+      ws.getCell(2, 40).value = "JUG";
+      ws.getCell(2, 41).value = "AVG";
+      
+      teamAcesData.forEach((team, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(team.name);
+        
+        const nameCell = ws.getCell(row, 38);
+        nameCell.value = team.name;
+        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
+        
+        ws.getCell(row, 39).value = team.totalAces;
+        ws.getCell(row, 40).value = team.gamesPlayed;
+        ws.getCell(row, 41).value = parseFloat(team.avgAces.toFixed(1));
+      });
+
+      // TABLA 9: ASISTENCIA EQUIPOS - Columna 43
+      const teamAsistenciaData = [...teams].sort((a, b) => b.avgAsistencia - a.avgAsistencia);
+      
+      ws.getCell(1, 45).value = "ASISTENCIA";
+      ws.getCell(2, 44).value = "TOT";
+      ws.getCell(2, 45).value = "JUG";
+      ws.getCell(2, 46).value = "AVG";
+      
+      teamAsistenciaData.forEach((team, index) => {
+        const row = index + 3;
+        const colors = getTeamColors(team.name);
+        
+        const nameCell = ws.getCell(row, 43);
+        nameCell.value = team.name;
+        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
+        nameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.bg.replace("#", "FF") }
+        };
+        
+        ws.getCell(row, 44).value = team.totalAsistencia;
+        ws.getCell(row, 45).value = team.gamesPlayed;
+        ws.getCell(row, 46).value = parseFloat(team.avgAsistencia.toFixed(1));
+      });
+
       // Configurar anchos de columna (extendido para las nuevas tablas)
       ws.columns = [
         // Jugadores
@@ -853,176 +1197,6 @@
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // ACES EQUIPOS + separador
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }              // ASISTENCIA EQUIPOS
       ];
-    }
-
-    function generateJornadaSheet(ws) {
-      let currentRow = 1;
-
-      processedData.forEach((matchData, matchIndex) => {
-        const teams = matchData.teamOrder.map(teamName => {
-          const players = matchData.players.filter(p => p.team === teamName);
-          players.sort((a,b) => {
-            if (a.absent && !b.absent) return 1;
-            if (!a.absent && b.absent) return -1;
-            return (b.points || 0) - (a.points || 0);
-          });
-          return {
-            name: teamName,
-            points: matchData.teams[teamName],
-            players,
-            colors: COLORES_EQUIPOS[teamName] || { bg: "#CCCCCC", fg: "#000000" }
-          };
-        });
-
-        // Header del partido
-        ws.getCell(currentRow, 1).value = `PARTIDA ${matchIndex + 1}`;
-        ws.getCell(currentRow, 1).font = { bold: true, size: 14 };
-        currentRow += 2;
-
-        // Clasificación de equipos
-        ws.getCell(currentRow, 1).value = "CLASIFICACION EQUIPOS";
-        ws.getCell(currentRow, 1).font = { bold: true, size: 13 };
-        currentRow++;
-
-        let equiposCol = 1;
-        teams.forEach((team, index) => {
-          const nameCell = ws.getCell(currentRow, equiposCol);
-          nameCell.value = team.name;
-          nameCell.font = { 
-            color: { argb: team.colors.fg.replace("#", "FF") },
-            bold: true 
-          };
-          nameCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: team.colors.bg.replace("#", "FF") }
-          };
-
-          ws.getCell(currentRow, equiposCol + 1).value = team.points;
-          equiposCol += (index < teams.length - 1) ? 3 : 2;
-        });
-        currentRow += 2;
-
-        // Headers de estadísticas por equipo
-        teams.forEach((team, teamIndex) => {
-          const startCol = teamIndex * 6 + 1;
-          
-          const teamCell = ws.getCell(currentRow, startCol);
-          teamCell.value = team.name;
-          teamCell.font = { 
-            color: { argb: team.colors.fg.replace("#", "FF") },
-            bold: true 
-          };
-          teamCell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: team.colors.bg.replace("#", "FF") }
-          };
-
-          ws.getCell(currentRow + 1, startCol).value = "Nombre";
-          ws.getCell(currentRow + 1, startCol + 1).value = "Puntos";
-          ws.getCell(currentRow + 1, startCol + 2).value = "Scratches";
-          ws.getCell(currentRow + 1, startCol + 3).value = "Palos";
-          ws.getCell(currentRow + 1, startCol + 4).value = "Aces";
-        });
-        currentRow += 2;
-
-        // Datos de jugadores
-        const maxPlayers = Math.max(...teams.map(team => team.players.length));
-        for (let playerIndex = 0; playerIndex < maxPlayers; playerIndex++) {
-          teams.forEach((team, teamIndex) => {
-            const startCol = teamIndex * 6 + 1;
-            const player = team.players[playerIndex];
-            
-            if (player) {
-              const nameCell = ws.getCell(currentRow + playerIndex, startCol);
-              nameCell.value = player.absent ? `${player.name} (NO ESTUVO PRESENTE)` : player.name;
-              nameCell.font = { 
-                color: { argb: team.colors.fg.replace("#", "FF") }
-              };
-              nameCell.fill = {
-                type: "pattern",
-                pattern: "solid",
-                fgColor: { argb: team.colors.bg.replace("#", "FF") }
-              };
-              
-              ws.getCell(currentRow + playerIndex, startCol + 1).value = player.points;
-              ws.getCell(currentRow + playerIndex, startCol + 2).value = player.scratches;
-              ws.getCell(currentRow + playerIndex, startCol + 3).value = player.palos;
-              ws.getCell(currentRow + playerIndex, startCol + 4).value = player.aces;
-            }
-          });
-        }
-        currentRow += maxPlayers + 2;
-
-        // [Resto del código de generación de estadísticas igual que antes...]
-        const teamTotals = teams.map(team => {
-          const totals = { scratches: 0, palos: 0, aces: 0 };
-          team.players.forEach(player => {
-            if (!player.absent) {
-              totals.scratches += player.scratches;
-              totals.palos += player.palos;
-              totals.aces += player.aces;
-            }
-          });
-          return totals;
-        });
-
-        // Generar filas igual que antes
-        const generalHeaderRow = [];
-        teams.forEach((team, index) => {
-          generalHeaderRow.push('');
-          generalHeaderRow.push("Puntos");
-          generalHeaderRow.push("Scratches");  
-          generalHeaderRow.push("Palos");
-          generalHeaderRow.push("Aces");
-          if (index < teams.length - 1) generalHeaderRow.push('');
-        });
-        ws.getRow(currentRow).values = generalHeaderRow;
-
-        const teamTotalRow = [];
-        teams.forEach((team, index) => {
-          teamTotalRow.push(team.name);
-          teamTotalRow.push(team.points);
-          teamTotalRow.push(teamTotals[index].scratches);
-          teamTotalRow.push(teamTotals[index].palos);
-          teamTotalRow.push(teamTotals[index].aces);
-          if (index < teams.length - 1) teamTotalRow.push('');
-        });
-        ws.getRow(currentRow + 1).values = teamTotalRow;
-
-        // Aplicar formato igual que antes...
-        let formatCol = 1;
-        teams.forEach((team, teamIndex) => {
-          for (let i = 0; i < 5; i++) {
-            const cell = ws.getCell(currentRow, formatCol + i);
-            cell.font = { bold: false, size: 13 };
-            cell.alignment = { horizontal: "center", vertical: "center" };
-            cell.border = {
-              top: { style: "thin" }, left: { style: "thin" },
-              bottom: { style: "thin" }, right: { style: "thin" }
-            };
-          }
-          formatCol += (teamIndex < teams.length - 1) ? 6 : 5;
-        });
-
-        currentRow += 14;
-      });
-
-      // Configurar anchos
-      if (processedData.length > 0) {
-        const firstMatchTeams = processedData[0].teamOrder.length;
-        const colWidths = [];
-        for (let teamIndex = 0; teamIndex < firstMatchTeams; teamIndex++) {
-          colWidths.push(15);
-          colWidths.push(8);
-          colWidths.push(10);
-          colWidths.push(8);
-          colWidths.push(8);
-          if (teamIndex < firstMatchTeams - 1) colWidths.push(6);
-        }
-        ws.columns = colWidths.map(width => ({ width }));
-      }
     }
 
     function showError(msg) {

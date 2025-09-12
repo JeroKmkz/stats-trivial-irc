@@ -497,9 +497,9 @@
               };
             });
 
-            // Headers de equipos con merge
+            // Headers de equipos con merge - EMPEZAR EN COLUMNA 2
             teams.forEach((team, teamIndex) => {
-              const startCol = 2 + teamIndex * 6; // Columna 2, 8, 14, ... (después de la columna padding inicial)
+              const startCol = 2 + teamIndex * 6; // Columna 2, 8, 14, ...
               const endCol = startCol + 3;
               
               ws.mergeCells(currentRow, startCol, currentRow, endCol);
@@ -518,27 +518,25 @@
             });
             currentRow++;
 
-            // Sub-headers
-            ws.getCell(currentRow, 1).value = '';  // Columna padding inicial
+            // Sub-headers - EMPEZAR EN COLUMNA 2
             teams.forEach((team, teamIndex) => {
-              const startCol = 2 + teamIndex * 6; // Después de la columna padding inicial
+              const startCol = 2 + teamIndex * 6;
               ws.getCell(currentRow, startCol).value = "Puntos";
               ws.getCell(currentRow, startCol + 1).value = "Scratches";
               ws.getCell(currentRow, startCol + 2).value = "Palos";
               ws.getCell(currentRow, startCol + 3).value = "Aces";
               if (teamIndex < teams.length - 1) {
-                ws.getCell(currentRow, startCol + 4).value = "";  // Separador
+                ws.getCell(currentRow, startCol + 4).value = "";
               }
             });
             currentRow++;
 
-            // Datos de jugadores
+            // Datos de jugadores - EMPEZAR EN COLUMNA 2
             const maxPlayers = Math.max(...teams.map(t => t.players.length));
             for (let playerIndex = 0; playerIndex < maxPlayers; playerIndex++) {
-              ws.getCell(currentRow, 1).value = '';  // Columna padding inicial
               teams.forEach((team, teamIndex) => {
                 const player = team.players[playerIndex];
-                const startCol = 2 + teamIndex * 6; // Después de la columna padding inicial
+                const startCol = 2 + teamIndex * 6;
                 if (player) {
                   ws.getCell(currentRow, startCol).value = player.absent ? "" : player.points;
                   ws.getCell(currentRow, startCol + 1).value = player.absent ? "" : player.scratches;
@@ -564,18 +562,20 @@
             currentRow += 14;
           });
 
-          // Configurar anchos (incluyendo columnas de padding)
+          // Configurar anchos - AÑADIR PADDING
           if (processedData.length > 0) {
             const firstMatchTeams = processedData[0].teamOrder.length;
             const colWidths = [];
             
-            // Columna padding inicial
+            // Columna padding inicial (columna 1)
             colWidths.push(3);
             
+            // Datos originales (empiezan en columna 2)
             for (let teamIndex = 0; teamIndex < firstMatchTeams; teamIndex++) {
               colWidths.push(15);
               colWidths.push(8);
               colWidths.push(10);
+              colWidths.push(8);
               colWidths.push(8);
               if (teamIndex < firstMatchTeams - 1) colWidths.push(6);
             }
@@ -586,9 +586,10 @@
             ws.columns = colWidths.map(width => ({ width }));
           }
 
-          // Añadir fila padding final
-          const paddingRow = ws.addRow([]);
-          paddingRow.height = 5; // 1/3 de la altura estándar (15)
+          // AÑADIR FILA PADDING FINAL
+          const paddingRowNum = ws.rowCount + 1;
+          const paddingRow = ws.getRow(paddingRowNum);
+          paddingRow.height = 5; // 1/3 de altura estándar
 
         } else if (currentProcess === 'totales') {
           // PROCESO 2: Solo hoja "Totales"
@@ -710,10 +711,10 @@
       // Limitar a top 33 jugadores para cada estadística
       const maxPlayers = 33;
 
-      // TABLA 1: PUNTOS JUGADORES - Columna 2 (después de padding inicial)
+      // TABLA 1: PUNTOS JUGADORES - EMPEZAR EN COLUMNA 2
       const playerPointsData = [...players].sort((a, b) => b.avgPoints - a.avgPoints).slice(0, maxPlayers);
       
-      ws.getCell(1, 3).value = "PUNTOS"; // Columna 3 (después de padding)
+      ws.getCell(1, 3).value = "PUNTOS";
       ws.getCell(2, 2).value = "TOT";
       ws.getCell(2, 3).value = "JUG";
       ws.getCell(2, 4).value = "AVG";
@@ -722,13 +723,10 @@
         const row = index + 3;
         const colors = getTeamColors(player.team);
         
-        const nameCell = ws.getCell(row, 1); // Columna 1 es padding inicial
-        nameCell.value = '';
-        
-        const playerNameCell = ws.getCell(row, 2); // Empezar datos en columna 2
-        playerNameCell.value = player.name;
-        playerNameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
-        playerNameCell.fill = {
+        const nameCell = ws.getCell(row, 1);
+        nameCell.value = player.name;
+        nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
+        nameCell.fill = {
           type: "pattern",
           pattern: "solid",
           fgColor: { argb: colors.bg.replace("#", "FF") }
@@ -739,7 +737,7 @@
         ws.getCell(row, 4).value = parseFloat(player.avgPoints.toFixed(1));
       });
 
-      // TABLA 2: POSTES JUGADORES - Columna 7
+      // TABLA 2: POSTES JUGADORES - Columna 6
       const playerPalosData = [...players].sort((a, b) => b.avgPalos - a.avgPalos).slice(0, maxPlayers);
       
       ws.getCell(1, 8).value = "POSTES";
@@ -765,7 +763,7 @@
         ws.getCell(row, 9).value = parseFloat(player.avgPalos.toFixed(1));
       });
 
-      // TABLA 3: SCRATCHES JUGADORES - Columna 12
+      // TABLA 3: SCRATCHES JUGADORES - Columna 11
       const playerScratchesData = [...players].sort((a, b) => b.avgScratches - a.avgScratches).slice(0, maxPlayers);
       
       ws.getCell(1, 13).value = "SCRATCHES";
@@ -791,7 +789,7 @@
         ws.getCell(row, 14).value = parseFloat(player.avgScratches.toFixed(1));
       });
 
-      // TABLA 4: ACES JUGADORES - Columna 17
+      // TABLA 4: ACES JUGADORES - Columna 16
       const playerAcesData = [...players].sort((a, b) => b.avgAces - a.avgAces).slice(0, maxPlayers);
       
       ws.getCell(1, 18).value = "ACES";
@@ -817,19 +815,19 @@
         ws.getCell(row, 19).value = parseFloat(player.avgAces.toFixed(1));
       });
 
-      // TABLA 5: PUNTOS EQUIPOS - Columna 23 (después de 3 filas de separación)
+      // TABLA 5: PUNTOS EQUIPOS - Columna 22 (después de 3 filas de separación)
       const teamPointsData = [...teams].sort((a, b) => b.avgPoints - a.avgPoints);
       
-      ws.getCell(1, 24).value = "PUNTOS";
-      ws.getCell(2, 23).value = "TOT";
-      ws.getCell(2, 24).value = "JUG";
-      ws.getCell(2, 25).value = "AVG";
+      ws.getCell(1, 25).value = "PUNTOS";
+      ws.getCell(2, 24).value = "TOT";
+      ws.getCell(2, 25).value = "JUG";
+      ws.getCell(2, 26).value = "AVG";
       
       teamPointsData.forEach((team, index) => {
         const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 22);
+        const nameCell = ws.getCell(row, 23);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -838,24 +836,24 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 23).value = team.totalPoints;
-        ws.getCell(row, 24).value = team.gamesPlayed;
-        ws.getCell(row, 25).value = parseFloat(team.avgPoints.toFixed(1));
+        ws.getCell(row, 24).value = team.totalPoints;
+        ws.getCell(row, 25).value = team.gamesPlayed;
+        ws.getCell(row, 26).value = parseFloat(team.avgPoints.toFixed(1));
       });
 
       // TABLA 6: POSTES EQUIPOS - Columna 28
       const teamPalosData = [...teams].sort((a, b) => b.avgPalos - a.avgPalos);
       
-      ws.getCell(1, 29).value = "POSTES";
-      ws.getCell(2, 28).value = "TOT";
-      ws.getCell(2, 29).value = "JUG";
-      ws.getCell(2, 30).value = "AVG";
+      ws.getCell(1, 30).value = "POSTES";
+      ws.getCell(2, 29).value = "TOT";
+      ws.getCell(2, 30).value = "JUG";
+      ws.getCell(2, 31).value = "AVG";
       
       teamPalosData.forEach((team, index) => {
         const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 27);
+        const nameCell = ws.getCell(row, 28);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -864,24 +862,24 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 28).value = team.totalPalos;
-        ws.getCell(row, 29).value = team.gamesPlayed;
-        ws.getCell(row, 30).value = parseFloat(team.avgPalos.toFixed(1));
+        ws.getCell(row, 29).value = team.totalPalos;
+        ws.getCell(row, 30).value = team.gamesPlayed;
+        ws.getCell(row, 31).value = parseFloat(team.avgPalos.toFixed(1));
       });
 
       // TABLA 7: SCRATCHES EQUIPOS - Columna 33
       const teamScratchesData = [...teams].sort((a, b) => b.avgScratches - a.avgScratches);
       
-      ws.getCell(1, 34).value = "SCRATCHES";
-      ws.getCell(2, 33).value = "TOT";
-      ws.getCell(2, 34).value = "JUG";
-      ws.getCell(2, 35).value = "AVG";
+      ws.getCell(1, 35).value = "SCRATCHES";
+      ws.getCell(2, 34).value = "TOT";
+      ws.getCell(2, 35).value = "JUG";
+      ws.getCell(2, 36).value = "AVG";
       
       teamScratchesData.forEach((team, index) => {
         const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 32);
+        const nameCell = ws.getCell(row, 33);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -890,24 +888,24 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 33).value = team.totalScratches;
-        ws.getCell(row, 34).value = team.gamesPlayed;
-        ws.getCell(row, 35).value = parseFloat(team.avgScratches.toFixed(1));
+        ws.getCell(row, 34).value = team.totalScratches;
+        ws.getCell(row, 35).value = team.gamesPlayed;
+        ws.getCell(row, 36).value = parseFloat(team.avgScratches.toFixed(1));
       });
 
       // TABLA 8: ACES EQUIPOS - Columna 38
       const teamAcesData = [...teams].sort((a, b) => b.avgAces - a.avgAces);
       
-      ws.getCell(1, 39).value = "ACES";
-      ws.getCell(2, 38).value = "TOT";
-      ws.getCell(2, 39).value = "JUG";
-      ws.getCell(2, 40).value = "AVG";
+      ws.getCell(1, 40).value = "ACES";
+      ws.getCell(2, 39).value = "TOT";
+      ws.getCell(2, 40).value = "JUG";
+      ws.getCell(2, 41).value = "AVG";
       
       teamAcesData.forEach((team, index) => {
         const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 37);
+        const nameCell = ws.getCell(row, 38);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -916,24 +914,24 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 38).value = team.totalAces;
-        ws.getCell(row, 39).value = team.gamesPlayed;
-        ws.getCell(row, 40).value = parseFloat(team.avgAces.toFixed(1));
+        ws.getCell(row, 39).value = team.totalAces;
+        ws.getCell(row, 40).value = team.gamesPlayed;
+        ws.getCell(row, 41).value = parseFloat(team.avgAces.toFixed(1));
       });
 
       // TABLA 9: ASISTENCIA EQUIPOS - Columna 43
       const teamAsistenciaData = [...teams].sort((a, b) => b.avgAsistencia - a.avgAsistencia);
       
-      ws.getCell(1, 44).value = "ASISTENCIA";
-      ws.getCell(2, 43).value = "TOT";
-      ws.getCell(2, 44).value = "JUG";
-      ws.getCell(2, 45).value = "AVG";
+      ws.getCell(1, 45).value = "ASISTENCIA";
+      ws.getCell(2, 44).value = "TOT";
+      ws.getCell(2, 45).value = "JUG";
+      ws.getCell(2, 46).value = "AVG";
       
       teamAsistenciaData.forEach((team, index) => {
         const row = index + 3;
         const colors = getTeamColors(team.name);
         
-        const nameCell = ws.getCell(row, 42);
+        const nameCell = ws.getCell(row, 43);
         nameCell.value = team.name;
         nameCell.font = { color: { argb: colors.fg.replace("#", "FF") } };
         nameCell.fill = {
@@ -942,12 +940,12 @@
           fgColor: { argb: colors.bg.replace("#", "FF") }
         };
         
-        ws.getCell(row, 43).value = team.totalAsistencia;
-        ws.getCell(row, 44).value = team.gamesPlayed;
-        ws.getCell(row, 45).value = parseFloat(team.avgAsistencia.toFixed(1));
+        ws.getCell(row, 44).value = team.totalAsistencia;
+        ws.getCell(row, 45).value = team.gamesPlayed;
+        ws.getCell(row, 46).value = parseFloat(team.avgAsistencia.toFixed(1));
       });
 
-      // Configurar anchos de columna (extendido para las nuevas tablas y padding)
+      // Configurar anchos de columna (extendido para las nuevas tablas + padding)
       ws.columns = [
         // Columna padding inicial
         { width: 3 },
@@ -966,9 +964,10 @@
         { width: 3 } // Columna padding final
       ];
 
-      // Añadir fila padding final
-      const paddingRow = ws.addRow([]);
-      paddingRow.height = 5; // 1/3 de la altura estándar (15)
+      // AÑADIR FILA PADDING FINAL
+      const paddingRowNum = ws.rowCount + 1;
+      const paddingRow = ws.getRow(paddingRowNum);
+      paddingRow.height = 5; // 1/3 de altura estándar
     }
 
     function showError(msg) {

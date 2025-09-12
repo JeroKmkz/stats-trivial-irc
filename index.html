@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4 + Marco</title>
+  <title>Procesador de Logs de Trivial IRC — V4.1</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -73,7 +73,6 @@
     let fileNames = [];
     let currentProcess = ''; // 'jornada' | 'totales'
 
-    // ===== UI: habilitar botones al elegir ficheros =====
     document.addEventListener('DOMContentLoaded', () => {
       const inJ = document.getElementById('fileInputJornada');
       const inT = document.getElementById('fileInputTotales');
@@ -83,7 +82,6 @@
       if (inT) inT.addEventListener('change', () => { bT.disabled = !(inT.files && inT.files.length); fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[]; currentProcess='totales'; });
     });
 
-    // ===== Mensajes en el área de resultados =====
     function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
     function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 
@@ -121,7 +119,6 @@
           const buffer = await file.arrayBuffer();
           const workbook = new ExcelJS.Workbook();
           await workbook.xlsx.load(buffer);
-          // Hoja "Estadísticas" tolerante a tildes/variantes
           const worksheet =
             workbook.getWorksheet('Estadísticas') ||
             workbook.getWorksheet('Estadisticas') ||
@@ -145,22 +142,18 @@
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
 
-    // Padding/Marco visual reutilizable
+    // Marco: fila vacía arriba/abajo y columna vacía al final
     function addFraming(ws, padWidth){
-      // Añadir columna vacía al final (mismo ancho que la primera de padding)
       if (Array.isArray(ws.columns) && ws.columns.length){
         const width = padWidth ?? ws.columns[0]?.width ?? 3;
         ws.columns = [...ws.columns, { width }];
       }
-      // Fila vacía al inicio (mitad de alto)
       ws.spliceRows(1, 0, []);
       try { ws.getRow(1).height = 7.5; } catch {}
-      // Fila vacía al final (misma altura)
       ws.addRow([]);
       try { ws.getRow(ws.lastRow.number).height = 7.5; } catch {}
     }
 
-    // Busca la columna donde empieza el bloque (col del texto "PUNTOS")
     function findHeaderStartCol(row){
       const n = row.actualCellCount || row.cellCount || 100;
       for (let c=1; c<=n; c++){
@@ -181,7 +174,7 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
-          currentRow += 14; // cada bloque ocupa ~14 filas
+          currentRow += 14;
         } else { currentRow++; }
       }
       return matches;
@@ -191,8 +184,6 @@
       try{
         const teamRow = worksheet.getRow(startRow + 1);
         const teams = {}; const teamOrder = []; const players = [];
-        // Layout: [padding][NOMBRE][Puntos][Scratches][Palos][Aces][sep]
-        // startCol apunta a "PUNTOS" ⇒ el nombre está en startCol - 1
         let col = Math.max(1, startCol - 1);
         const maxC = worksheet.columnCount || 60;
         while (col <= maxC){
@@ -200,7 +191,6 @@
           if (!teamName) break;
           const teamPoints = numOrNull(teamRow.getCell(col + 1).value);
           teams[teamName] = teamPoints ?? 0; teamOrder.push(teamName);
-          // 10 filas de jugadores debajo
           for (let r = startRow + 2; r < startRow + 12; r++){
             const row = worksheet.getRow(r);
             const name = xlsToString(row.getCell(col).value).trim();
@@ -212,13 +202,12 @@
             const absent = (pPoints === null);
             players.push({ name: name.toUpperCase(), team: teamName, points: absent ? null : pPoints, scratches: absent ? 0 : pScr, palos: absent ? 0 : pPalos, aces: absent ? 0 : pAces, absent });
           }
-          col += 6; // siguiente equipo (5 datos + 1 separador)
+          col += 6;
         }
         return { teams, teamOrder, players };
       }catch(e){ console.error('extractSingleMatch error', e); return null; }
     }
 
-    // ===== Vista previa (Totales) =====
     function displayTotalesOnlyResults(){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML='';
       const allPlayers = new Set(); let totalMatches = processedData.length;
@@ -232,7 +221,6 @@
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
-    // ===== Vista previa (Jornada) =====
     function displayResults(allData){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML = '';
       const info = document.createElement('div'); info.className = 'log-info';
@@ -282,13 +270,11 @@
       showSuccess(`${allData.length} partida${allData.length>1?'s':''} procesada${allData.length>1?'s':''} correctamente`);
     }
 
-    // ===== Generación Excel =====
     async function downloadExcel(){
       if (!processedData || processedData.length === 0) return showError('No hay datos procesados');
       try{
         const wb = new ExcelJS.Workbook();
         if (currentProcess === 'jornada'){
-          // Hoja única "Estadísticas" con TODAS las partidas apiladas
           const ws = wb.addWorksheet('Estadísticas');
           let currentRow = 1;
           processedData.forEach(matchData => {
@@ -324,16 +310,15 @@
               let c=2; teams.forEach((t,ti)=>{ const p=t.players[i]; if(p){ for(let j=0;j<5;j++){ const cell=ws.getCell(r, c+j); cell.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; cell.alignment={horizontal: j===0?'left':'center', vertical:'center'}; } } c += (ti<teams.length-1)?6:5; });
             }
 
-            currentRow += 14; // siguiente bloque
+            currentRow += 14;
           });
 
-          // Anchos + marco
           if (processedData.length>0){
             const tcount=processedData[0].teamOrder.length;
             const widths=[3];
             for(let i=0;i<tcount;i++){ widths.push(15,8,10,8,8); if(i<tcount-1) widths.push(6); }
             ws.columns = widths.map(w=>({width:w}));
-            addFraming(ws, widths[0]); // columna final + fila arriba/abajo
+            addFraming(ws, widths[0]);
           }
         } else if (currentProcess === 'totales'){
           const ws = wb.addWorksheet('Totales');
@@ -359,7 +344,6 @@
     function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
       processedData.forEach(match => {
-        // Equipos
         match.teamOrder.forEach(teamName => {
           if (!teamTotals[teamName]) teamTotals[teamName] = { name:teamName, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,totalAsistencia:0,gamesPlayed:0 };
           teamTotals[teamName].totalPoints += match.teams[teamName] || 0;
@@ -368,7 +352,6 @@
           teamTotals[teamName].gamesPlayed += 1;
           teamPlayers.forEach(p=>{ teamTotals[teamName].totalPalos += p.palos||0; teamTotals[teamName].totalScratches += p.scratches||0; teamTotals[teamName].totalAces += p.aces||0; });
         });
-        // Jugadores
         match.players.forEach(p=>{
           if (!p.absent){
             if (!playerTotals[p.name]) playerTotals[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
@@ -392,7 +375,7 @@
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
-      // === Bloques de jugadores ===
+      // === Bloques de jugadores (títulos 1 columna más a la derecha) ===
       const pBlocks = [
         { title:'PUNTOS',     baseCol:2,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
         { title:'POSTES',     baseCol:7,  sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
@@ -401,11 +384,18 @@
       ];
 
       pBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+1).value = b.title;
+        // Mover el título una columna a la derecha
+        ws.getCell(1, b.baseCol+2).value = b.title;
+        // Cabecera
         ws.getCell(2, b.baseCol).value = 'NOMBRE';
         ws.getCell(2, b.baseCol+1).value = 'TOT';
         ws.getCell(2, b.baseCol+2).value = 'JUG';
         ws.getCell(2, b.baseCol+3).value = 'AVG';
+        // Alineación cabecera numérica a la derecha
+        ws.getCell(2, b.baseCol+1).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+2).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
+
         const data = [...players].sort(b.sort);
         data.forEach((p, idx)=>{
           const row = idx + 3; const colors = getTeamColors(p.team);
@@ -415,13 +405,17 @@
           ws.getCell(row, b.baseCol+1).value = tot;
           ws.getCell(row, b.baseCol+2).value = gp;
           ws.getCell(row, b.baseCol+3).value = avg;
+          // Alinear a la derecha TOT/JUG/AVG
+          ws.getCell(row, b.baseCol+1).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+2).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+3).alignment = { horizontal: 'right' };
         });
       });
 
       // Separación visual
       ws.getCell(1, 22).value = '';
 
-      // === Bloques de equipos ===
+      // === Bloques de equipos (títulos 1 columna más a la derecha) ===
       const tBlocks = [
         { title:'PUNTOS',     baseCol:24, sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>[t.totalPoints,t.gamesPlayed,+t.avgPoints.toFixed(1)] },
         { title:'POSTES',     baseCol:29, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>[t.totalPalos,t.gamesPlayed,+t.avgPalos.toFixed(1)] },
@@ -431,11 +425,16 @@
       ];
 
       tBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+1).value = b.title;
+        ws.getCell(1, b.baseCol+2).value = b.title; // título desplazado
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
         ws.getCell(2, b.baseCol+1).value = 'TOT';
         ws.getCell(2, b.baseCol+2).value = 'JUG';
         ws.getCell(2, b.baseCol+3).value = 'AVG';
+        // Alineación cabecera numérica a la derecha
+        ws.getCell(2, b.baseCol+1).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+2).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
+
         const data = [...teams].sort(b.sort);
         data.forEach((t, idx)=>{
           const row = idx + 3; const colors = getTeamColors(t.name);
@@ -445,6 +444,10 @@
           ws.getCell(row, b.baseCol+1).value = tot;
           ws.getCell(row, b.baseCol+2).value = gp;
           ws.getCell(row, b.baseCol+3).value = avg;
+          // Alinear a la derecha TOT/JUG/AVG
+          ws.getCell(row, b.baseCol+1).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+2).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+3).alignment = { horizontal: 'right' };
         });
       });
 
@@ -465,7 +468,7 @@
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== Parser de logs (base V1 con mejora de equipos multi-palabra) =====
+    // ===== Parser de logs =====
     function parseLogFile(content){
       const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
       const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));

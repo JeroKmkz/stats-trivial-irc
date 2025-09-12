@@ -523,55 +523,62 @@
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== Parser de logs (símbolos por delante de 'A' para el corte entre equipos) =====
-    function parseLogFileSymbols(content){
-      const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
-      const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));
-      const playerStart = lines.findIndex(l=>l.includes('CLASIFICACION INDIVIDUAL'));
-      if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
+// ===== Parser de logs (símbolos por delante de 'A' + equipos por orden alfabético) =====
+function parseLogFileSymbols(content){
+  const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
+  const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));
+  const playerStart = lines.findIndex(l=>l.includes('CLASIFICACION INDIVIDUAL'));
+  if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
 
-      // Equipos tal como vienen (ganador primero)
-      const teams = {}; const teamOrder = [];
-      for (let i=teamStart+1; i<playerStart; i++){
-        const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
-        if (!m) continue; const team=m[1].trim(); const points=parseInt(m[2],10);
-        teams[team]=points; teamOrder.push(team);
+  // Equipos tal como vienen (ganador primero) -> útil para mostrar marcador si quieres
+  const teams = {}, teamOrder = [];
+  for (let i=teamStart+1; i<playerStart; i++){
+    const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    const team = m[1].trim();
+    const points = parseInt(m[2], 10);
+    teams[team] = points;
+    teamOrder.push(team);
+  }
+
+  // Jugadores tal cual
+  const players = [];
+  for (let i=playerStart+1; i<lines.length; i++){
+    const line = lines[i]; if(!line) continue;
+    const parts = line.split(/\s+/); if (parts.length < 2) continue;
+    const name = parts[0];
+    const points = parseInt(parts[1], 10);
+    players.push({
+      name: name.toUpperCase(),
+      points: line.includes('NO ESTUVO PRESENTE') ? null : points,
+      aces: parseInt((line.match(/Aces:\s*(\d+)/) || [0,0])[1],10),
+      scratches: parseInt((line.match(/Scr:\s*(\d+)/) || [0,0])[1],10),
+      palos: parseInt((line.match(/Palos:\s*(\d+)/) || [0,0])[1],10),
+      absent: line.includes('NO ESTUVO PRESENTE')
+    });
+  }
+
+  // *** Asignación a equipos usando ORDEN ALFABÉTICO DE EQUIPO ***
+  // (símbolos como ^ o [ cuentan como anteriores a 'A')
+  const teamsAlpha = Object.keys(teams).sort((a,b)=>cmpNick(a,b));
+
+  let switched = false;
+  if (players.length){
+    players[0].team = teamsAlpha[0] || 'SinEquipo';
+    let prevNick = players[0].name;
+
+    for (let i=1; i<players.length; i++){
+      const curr = players[i];
+      if (!switched && cmpNick(curr.name, prevNick) < 0) {
+        switched = true; // a partir de aquí, segundo equipo alfabético
       }
-
-      // Jugadores tal cual
-      const players = [];
-      for (let i=playerStart+1; i<lines.length; i++){
-        const line = lines[i]; if(!line) continue;
-        const parts=line.split(/\s+/); if (parts.length<2) continue;
-        const name=parts[0]; const points=parseInt(parts[1],10);
-        players.push({
-          name: name.toUpperCase(),
-          points: line.includes('NO ESTUVO PRESENTE') ? null : points,
-          aces: parseInt((line.match(/Aces:\s*(\d+)/) || [0,0])[1],10),
-          scratches: parseInt((line.match(/Scr:\s*(\d+)/) || [0,0])[1],10),
-          palos: parseInt((line.match(/Palos:\s*(\d+)/) || [0,0])[1],10),
-          absent: line.includes('NO ESTUVO PRESENTE')
-        });
-      }
-
-      // Asignación a equipos por rotura alfabética con símbolos delante de 'A'
-      const teamNames = teamOrder.slice();
-      let switched = false;
-      if (players.length){
-        players[0].team = teamNames[0] || 'SinEquipo';
-        let prevNick = players[0].name;
-        for (let i=1;i<players.length;i++){
-          const curr = players[i];
-          if (!switched && cmpNick(curr.name, prevNick) < 0){
-            switched = true; // desde aquí, segundo equipo
-          }
-          curr.team = switched ? (teamNames[1]||'SinEquipo') : (teamNames[0]||'SinEquipo');
-          prevNick = curr.name;
-        }
-      }
-
-      return { teams, teamOrder, players };
+      curr.team = switched ? (teamsAlpha[1] || 'SinEquipo') : (teamsAlpha[0] || 'SinEquipo');
+      prevNick = curr.name;
     }
+  }
+
+  return { teams, teamOrder, players };
+}
   </script>
 </body>
 </html>

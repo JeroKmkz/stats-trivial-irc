@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC V4</title>
+  <title>Procesador de Logs de Trivial IRC</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body {
@@ -111,7 +111,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
+    <h1>🎯 Procesador de Logs de Trivial IRC V4</h1>
     
     <!-- PROCESO 1: Estadísticas de la Jornada -->
     <div class="upload-section">
@@ -1011,10 +1011,10 @@
         ws.getCell(row, 46).value = parseFloat(team.avgAsistencia.toFixed(1));
       });
 
-      // Configurar anchos de columna - CAMBIO: añadir columna padding inicial
+      // Configurar anchos de columna - CAMBIO: añadir columna padding inicial (1/4 en lugar de 1/3)
       ws.columns = [
-        // Columna padding inicial
-        { width: 3 },
+        // Columna padding inicial (1/4 del ancho estándar)
+        { width: 2.25 },
         // Jugadores (ahora empiezan en columna 2)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // PUNTOS + separador
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // POSTES + separador

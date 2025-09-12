@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.4</title>
+  <title>Procesador de Logs de Trivial IRC — V4.5</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -82,8 +82,8 @@
       if (inT) inT.addEventListener('change', () => { bT.disabled = !(inT.files && inT.files.length); fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[]; currentProcess='totales'; });
     });
 
-    function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
-    function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
+    function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class=\"error\">${msg}</div>`; res.style.display='block'; }
+    function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class=\"success\">${msg}</div>`; res.style.display='block'; }
 
     // ====== PROCESO 1: Jornada (desde logs .txt) ======
     function processJornada(){
@@ -217,7 +217,7 @@
         <p><strong>Jornadas procesadas:</strong> ${fileNames.length}</p>
         <p><strong>Partidas totales:</strong> ${totalMatches}</p>
         <p><strong>Jugadores únicos:</strong> ${allPlayers.size}</p>
-        <p><em>Pulsa "Descargar Excel" para generar el acumulado</em></p>`;
+        <p><em>Pulsa \"Descargar Excel\" para generar el acumulado</em></p>`;
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
@@ -255,7 +255,7 @@
           players.forEach(p=>{
             const row = document.createElement('tr'); row.className='player-row';
             row.innerHTML = `
-              <td style="text-align:left;font-weight:bold;">${p.name}</td>
+              <td style=\"text-align:left;font-weight:bold;\">${p.name}</td>
               <td>${p.absent? '': p.points}</td>
               <td>${p.absent? '': p.scratches}</td>
               <td>${p.absent? '': p.palos}</td>
@@ -340,7 +340,7 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ===== Totales/Medias con SCO (solo PUNTOS/SCRATCHES) + Top‑33 con fila altura baja =====
+    // ===== Totales/Medias con SCO (solo PUNTOS/SCRATCHES) + Top‑33 con fila separadora única =====
     function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
@@ -406,7 +406,7 @@
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
-      // === BLOQUES DE JUGADORES (títulos desplazados + fila vacía tras 33º con altura baja) ===
+      // === BLOQUES DE JUGADORES ===
       const pBlocks = [
         { title:'PUNTOS',     baseCol:2,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
         { title:'POSTES',     baseCol:7,  sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
@@ -425,7 +425,6 @@
         ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
 
         const data = [...players].sort(b.sort);
-        // Escribimos todos y luego insertamos fila vacía tras el 33º
         data.forEach((p, idx)=>{
           const row = 3 + idx; const colors = getTeamColors(p.team);
           const nameCell = ws.getCell(row, b.baseCol);
@@ -436,15 +435,16 @@
           ws.getCell(row, b.baseCol+2).value = gp;  ws.getCell(row, b.baseCol+2).alignment = { horizontal:'right' };
           ws.getCell(row, b.baseCol+3).value = avg; ws.getCell(row, b.baseCol+3).alignment = { horizontal:'right' };
         });
-        // Inserta la fila vacía (altura ~7.5) justo después del 33º (fila 3+33=36)
-        const cutRow = 36; if (data.length > 33){ ws.spliceRows(cutRow, 0, []); try { ws.getRow(cutRow).height = 7.5; } catch {} }
       });
 
-      // Separador visual entre jugadores y equipos
-      ws.getCell(1, 22).value = '';
+      // Inserta UNA sola fila vacía (altura ~7.5) justo después del 33º jugador
+      if (players.length > 33){
+        const cutRow = 36; // 2 cabeceras + 33 filas = 35; insertamos en 36
+        ws.spliceRows(cutRow, 0, []);
+        try { ws.getRow(cutRow).height = 7.5; } catch {}
+      }
 
       // === BLOQUES DE EQUIPOS (sin huecos; SCO solo en PUNTOS/SCRATCHES) ===
-      // Definimos baseCol de forma que los bloques se encadenen sin dejar una columna vacía extra.
       const tBlocks = [
         { title:'PUNTOS',     baseCol:24, hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
         { title:'POSTES',     baseCol:30, hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
@@ -454,7 +454,7 @@
       ];
 
       tBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+2).value = b.title; // título sobre TOT (o sobre JUG si hay SCO)
+        ws.getCell(1, b.baseCol+2).value = b.title;
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
         if (b.hasSco){
           ws.getCell(2, b.baseCol+1).value = 'SCO';
@@ -483,27 +483,25 @@
         });
       });
 
-      // Definición fina de anchos para que NO quede el hueco visual en POSTES/ACES/ASISTENCIA
+      // Anchos sin huecos visibles
       ws.columns = [
-        // Padding inicial
         { width: 2.25 },
         // Jugadores (4 bloques x 4 columnas + separadores)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // Separadores grandes entre jugadores y equipos
+        // Separadores entre jugadores y equipos
         { width: 3 }, { width: 3 },
-        // Equipos (encadenados sin huecos extra):
-        // PUNTOS (EQUIPO + SCO + TOT + JUG + AVG) + sep
+        // Equipos (PUNTOS con SCO)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // POSTES (EQUIPO + TOT + JUG + AVG) + sep
+        // POSTES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // SCRATCHES (EQUIPO + SCO + TOT + JUG + AVG) + sep
+        // SCRATCHES con SCO
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // ACES (EQUIPO + TOT + JUG + AVG) + sep
+        // ACES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // ASISTENCIA (EQUIPO + TOT + JUG + AVG)
+        // ASISTENCIA
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }
       ];
 

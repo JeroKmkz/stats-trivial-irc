@@ -3,660 +3,198 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC</title>
+  <title>Procesador de Logs de Trivial IRC – V1.5</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-    .container {
-      background-color: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      color: #333;
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .upload-section {
-      border: 2px dashed #ddd;
-      padding: 40px;
-      text-align: center;
-      margin-bottom: 30px;
-      border-radius: 8px;
-      background-color: #fafafa;
-    }
-    .upload-section:hover {
-      border-color: #007bff;
-      background-color: #f0f8ff;
-    }
-    input[type="file"] {
-      margin: 20px 0;
-    }
-    .button {
-      background-color: #007bff;
-      color: white;
-      padding: 12px 25px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-      margin: 10px;
-    }
-    .button:hover {
-      background-color: #0056b3;
-    }
-    .button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
-    .results {
-      margin-top: 30px;
-    }
-    .team-section {
-      margin-bottom: 30px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .team-header {
-      padding: 15px;
-      font-weight: bold;
-      font-size: 18px;
-      text-align: center;
-    }
-    .stats-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .stats-table th, .stats-table td {
-      padding: 8px 12px;
-      text-align: center;
-      border: 1px solid #ddd;
-    }
-    .stats-table th {
-      background-color: #f8f9fa;
-      font-weight: bold;
-    }
-    .player-row {
-      background-color: white;
-    }
-    .error {
-      color: #dc3545;
-      background-color: #f8d7da;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-    .success {
-      color: #155724;
-      background-color: #d4edda;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
-    .log-info {
-      background-color: #e9ecef;
-      padding: 15px;
-      border-radius: 5px;
-      margin: 20px 0;
-    }
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: #333; text-align: center; margin-bottom: 30px; }
+    .upload-section { border: 2px dashed #ddd; padding: 40px; text-align: center; margin-bottom: 30px; border-radius: 8px; background-color: #fafafa; }
+    .upload-section:hover { border-color: #007bff; background-color: #f0f8ff; }
+    input[type="file"] { margin: 20px 0; }
+    .button { background-color: #007bff; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px; }
+    .button:hover { background-color: #0056b3; }
+    .button:disabled { background-color: #ccc; cursor: not-allowed; }
+    .results { margin-top: 30px; }
+    .msg { padding: 12px 16px; border-radius: 6px; margin: 12px 0; }
+    .error { color: #842029; background-color: #f8d7da; }
+    .success { color: #0f5132; background-color: #d1e7dd; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
-    
-    <!-- PROCESO 1: Estadísticas de la Jornada -->
+    <h1>🎯 Procesador de Logs de Trivial IRC – V1.5</h1>
+
+    <!-- PROCESO 1: Estadísticas de la Jornada (desde LOGS .txt) -->
     <div class="upload-section">
       <h3>📊 Estadísticas de la Jornada</h3>
-      <p>Sube los logs (.txt) de las partidas de una jornada específica</p>
+      <p>Sube los logs (.txt) de las partidas de una jornada (normalmente 3 partidas con 2 equipos).</p>
       <input type="file" id="fileInputJornada" accept=".txt" multiple />
       <br />
-      <button class="button" onclick="processJornada()" id="processJornadaBtn" disabled>Procesar Jornada</button>
+      <button class="button" id="processJornadaBtn" disabled>Procesar Jornada (generar Excel)</button>
     </div>
 
-    <!-- PROCESO 2: Totales y Medias Liga -->
-    <div class="upload-section" style="border-color: #28a745; background-color: #f8fff9;">
+    <!-- PROCESO 2: Totales y Medias Liga (desde Excels ya generados) -->
+    <div class="upload-section" style="border-color:#28a745;background-color:#f8fff9;">
       <h3>🏆 Totales y Medias Liga</h3>
-      <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados</p>
+      <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados.</p>
       <input type="file" id="fileInputTotales" accept=".xlsx" multiple />
       <br />
-      <button class="button" onclick="processTotales()" id="processTotalesBtn" disabled style="background-color: #28a745;">Generar Totales Liga</button>
+      <button class="button" id="processTotalesBtn" disabled style="background-color:#28a745;">Generar Totales Liga</button>
     </div>
 
-    <div id="results" class="results" style="display: none;"></div>
+    <div id="results" class="results" style="display:none;"></div>
 
-    <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
-      <button class="button" onclick="downloadExcel()" id="downloadBtn">📥 Descargar Excel</button>
+    <div id="downloadSection" style="display:none; text-align:center; margin-top:30px;">
+      <button class="button" id="downloadBtn">📥 Descargar Excel</button>
     </div>
   </div>
 
-  /*
- V1.5 Integrada – Herramienta Logs → Excel (Jornadas + Totales)
- - Lee múltiples archivos de log (.txt) con el formato de #trivial-irc
- - Asume SIEMPRE 2 equipos por partida
- - Detecta equipos desde "CLASIFICACION EQUIPOS"
- - Asigna jugadores a equipos usando el corte de orden alfabético en "CLASIFICACION INDIVIDUAL"
-   (teniendo en cuenta que símbolos como [ o ^ van antes de A)
- - Genera una hoja por partida (Jornada) con maquetación cuidada
- - Genera una hoja de Totales (por jugador y por equipo) con medias y SCO
- - Ausentes: se muestran como "-" en la hoja de Jornada y NO suman en Totales
+  <script>
+  // ========= V1.5 – Núcleo =========
+  let __lastWorkbook = null;
 
- Requisitos en el HTML donde se use este script:
-   - Cargar ExcelJS en la página
-       <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
-   - Tener dos inputs opcionales para elegir ficheros .txt y un botón para procesar, por ejemplo:
-       <input id="fileInputLogs" type="file" multiple accept=".txt" />
-       <button id="btnProcesarLogs">Procesar logs → Excel</button>
-
- Uso rápido (enlazado automático al cargar este script):
-   document.getElementById('btnProcesarLogs').addEventListener('click', () => {
-     const files = document.getElementById('fileInputLogs').files;
-     procesarLogsAGenerarExcel(files);
-   });
-*/
-
-// ======= Utilidades =======
-function normalizeNick(nick) {
-  // Normaliza para comparar alfabéticamente (símbolos quedan por delante)
-  return (nick || "")
-    .toString()
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}+/gu, '');
-}
-
-function cmpNick(a, b) {
-  // Compara nicks con sensibilidad base y manteniendo símbolos primero
-  const A = normalizeNick(a);
-  const B = normalizeNick(b);
-  // localeCompare con 'base' ignora acentos; {numeric:true} por si hay dígitos
-  return A.localeCompare(B, 'es', { sensitivity: 'base', numeric: true });
-}
-
-function safeInt(x) {
-  const n = parseInt(String(x).replace(/[^0-9-]/g, ''), 10);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function trimOrNull(x) {
-  const s = String(x || '').trim();
-  return s.length ? s : null;
-}
-
-// ======= Parseo de un log (texto) a estructura de partida =======
-function parseLogTextToMatch(text) {
-  const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-  // 1) Detectar bloque de CLASIFICACION EQUIPOS (dos líneas siguientes contienen nombre y puntos)
-  const idxCE = lines.findIndex(l => /^(CLASIFICACION\s+EQUIPOS)$/i.test(l));
-  if (idxCE === -1) throw new Error('No se encontró encabezado "CLASIFICACION EQUIPOS"');
-
-  const lineTeam1 = lines[idxCE + 1];
-  const lineTeam2 = lines[idxCE + 2];
-  if (!lineTeam1 || !lineTeam2) throw new Error('Faltan líneas de equipos tras "CLASIFICACION EQUIPOS"');
-
-  const teamLineRe = /^(.*?)\s+(-?\d+)$/; // nombre libre + puntos enteros al final
-  const m1 = teamLineRe.exec(lineTeam1);
-  const m2 = teamLineRe.exec(lineTeam2);
-  if (!m1 || !m2) throw new Error('Formato de equipos no reconocido');
-
-  const team1 = { name: m1[1].trim(), points: safeInt(m1[2]) };
-  const team2 = { name: m2[1].trim(), points: safeInt(m2[2]) };
-
-  // 2) CLASIFICACION INDIVIDUAL
-  const idxCI = lines.findIndex((l, i) => i > idxCE && /^(CLASIFICACION\s+INDIVIDUAL)$/i.test(l));
-  if (idxCI === -1) throw new Error('No se encontró encabezado "CLASIFICACION INDIVIDUAL"');
-
-  const playerLines = [];
-  for (let i = idxCI + 1; i < lines.length; i++) {
-    const L = lines[i];
-    // Paramos si llega otro bloque inesperado (no suele pasar), si no, mantenemos hasta fin
-    playerLines.push(L);
+  function normalizeNick(nick) {
+    return (nick || "").toString().trim().toUpperCase().normalize('NFD').replace(/\p{Diacritic}+/gu, '');
   }
+  function cmpNick(a, b) { return normalizeNick(a).localeCompare(normalizeNick(b), 'es', { sensitivity: 'base', numeric: true }); }
+  function safeInt(x){ const n=parseInt(String(x).replace(/[^0-9-]/g,''),10); return Number.isFinite(n)?n:0; }
 
-  // 3) Parseo de cada línea de jugador
-  // Formatos esperados:
-  //  "NICK       15            Aces: 1       Scr: 1        Palos: 5"
-  //  "NICK       0            NO ESTUVO PRESENTE"
-  const rePresent = /^(\S[\S ]*?)(?:\s{2,}|\t+)(-?\d+)\s+.*?Aces:\s*(\d+)\s+Scr:\s*(\d+)\s+Palos:\s*(\d+)/i;
-  const reAbsent  = /^(\S[\S ]*?)(?:\s{2,}|\t+)(-?\d+)\s+NO\s+ESTUVO\s+PRESENTE/i;
-
-  const playersRaw = [];
-  for (const L of playerLines) {
-    let m = rePresent.exec(L);
-    if (m) {
-      playersRaw.push({
-        nick: m[1].trim(),
-        points: safeInt(m[2]),
-        aces: safeInt(m[3]),
-        scratches: safeInt(m[4]),
-        palos: safeInt(m[5]),
-        absent: false,
-      });
-      continue;
+  function parseLogTextToMatch(text){
+    const lines = String(text).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const idxCE = lines.findIndex(l=>/^(CLASIFICACION\s+EQUIPOS)$/i.test(l));
+    if(idxCE===-1) throw new Error('No se encontró "CLASIFICACION EQUIPOS"');
+    const lineTeam1 = lines[idxCE+1], lineTeam2 = lines[idxCE+2];
+    if(!lineTeam1||!lineTeam2) throw new Error('Faltan líneas de equipos');
+    const teamLineRe=/^(.*?)\s+(-?\d+)$/; const m1=teamLineRe.exec(lineTeam1), m2=teamLineRe.exec(lineTeam2);
+    if(!m1||!m2) throw new Error('Formato de equipos no reconocido');
+    const team1={name:m1[1].trim(), points:safeInt(m1[2])};
+    const team2={name:m2[1].trim(), points:safeInt(m2[2])};
+    const idxCI = lines.findIndex((l,i)=> i>idxCE && /^(CLASIFICACION\s+INDIVIDUAL)$/i.test(l));
+    if(idxCI===-1) throw new Error('No se encontró "CLASIFICACION INDIVIDUAL"');
+    const playerLines = lines.slice(idxCI+1);
+    const rePresent=/^(\S[\S ]*?)(?:\s{2,}|\t+)(-?\d+)\s+.*?Aces:\s*(\d+)\s+Scr:\s*(\d+)\s+Palos:\s*(\d+)/i;
+    const reAbsent =/^(\S[\S ]*?)(?:\s{2,}|\t+)(-?\d+)\s+NO\s+ESTUVO\s+PRESENTE/i;
+    const playersRaw=[];
+    for(const L of playerLines){
+      let m=rePresent.exec(L); if(m){ playersRaw.push({nick:m[1].trim(), points:safeInt(m[2]), aces:safeInt(m[3]), scratches:safeInt(m[4]), palos:safeInt(m[5]), absent:false}); continue; }
+      m=reAbsent.exec(L); if(m){ playersRaw.push({nick:m[1].trim(), points:0, aces:0, scratches:0, palos:0, absent:true}); continue; }
     }
-    m = reAbsent.exec(L);
-    if (m) {
-      playersRaw.push({
-        nick: m[1].trim(),
-        points: 0, // para Totales no contará por absent=true
-        aces: 0,
-        scratches: 0,
-        palos: 0,
-        absent: true,
-      });
-      continue;
+    if(!playersRaw.length) throw new Error('No se detectaron líneas de jugadores');
+    const A=[], B=[]; let switched=false; let prev=playersRaw[0].nick; A.push(playersRaw[0]);
+    for(let i=1;i<playersRaw.length;i++){ const curr=playersRaw[i]; if(!switched && cmpNick(curr.nick, prev)<0){ switched=true; } (switched?B:A).push(curr); prev=curr.nick; }
+    return { teams:[ {name:team1.name, points:team1.points, players:A}, {name:team2.name, points:team2.points, players:B} ] };
+  }
+
+  async function buildWorkbookFromMatches(matches){
+    const wb=new ExcelJS.Workbook(); wb.creator='Trivial-IRC V1.5'; wb.created=new Date();
+    matches.forEach((m,i)=>generateJornadaSheet(wb,m,i+1));
+    generateTotalsSheet(wb,matches);
+    return wb;
+  }
+
+  function styleHeader(c){ c.font={bold:true}; c.alignment={vertical:'middle', horizontal:'center'}; }
+  function styleCenter(c){ c.alignment={vertical:'middle', horizontal:'center'}; }
+  function styleLeft(c){ c.alignment={vertical:'middle', horizontal:'left'}; }
+  function setAllBorders(c){ c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
+
+  function generateJornadaSheet(workbook, match, ordinal){
+    const ws=workbook.addWorksheet('Jornada '+ordinal);
+    ws.mergeCells('A1','E1'); ws.mergeCells('G1','K1');
+    ws.getCell('A1').value=match.teams[0].name+' ('+match.teams[0].points+')';
+    ws.getCell('G1').value=match.teams[1].name+' ('+match.teams[1].points+')';
+    styleHeader(ws.getCell('A1')); styleHeader(ws.getCell('G1'));
+    ws.getRow(3).values=['Nick','Puntos','Aces','Scr','Palos','', 'Nick','Puntos','Aces','Scr','Palos'];
+    ['A3','B3','C3','D3','E3','G3','H3','I3','J3','K3'].forEach(function(c){ styleHeader(ws.getCell(c)); setAllBorders(ws.getCell(c)); });
+    const rows=Math.max(match.teams[0].players.length, match.teams[1].players.length);
+    for(var i=0;i<rows;i++){
+      var r=4+i; var pA=match.teams[0].players[i]; var pB=match.teams[1].players[i];
+      if(pA){ var mark=pA.absent?'-':null; ws.getCell('A'+r).value=pA.nick; ws.getCell('B'+r).value=pA.absent?mark:pA.points; ws.getCell('C'+r).value=pA.absent?mark:pA.aces; ws.getCell('D'+r).value=pA.absent?mark:pA.scratches; ws.getCell('E'+r).value=pA.absent?mark:pA.palos; }
+      if(pB){ var markB=pB.absent?'-':null; ws.getCell('G'+r).value=pB.nick; ws.getCell('H'+r).value=pB.absent?markB:pB.points; ws.getCell('I'+r).value=pB.absent?markB:pB.aces; ws.getCell('J'+r).value=pB.absent?markB:pB.scratches; ws.getCell('K'+r).value=pB.absent?markB:pB.palos; }
+      ['A','B','C','D','E','G','H','I','J','K'].forEach(function(col){ var cell=ws.getCell(col+String(r)); setAllBorders(cell); if(col==='A'||col==='G') styleLeft(cell); else styleCenter(cell); });
     }
-    // si no encaja, la ignoramos silenciosamente (líneas vacías u otros bloques)
+    ws.columns=[{key:'A',width:22},{key:'B',width:10},{key:'C',width:8},{key:'D',width:8},{key:'E',width:8},{key:'F',width:2},{key:'G',width:22},{key:'H',width:10},{key:'I',width:8},{key:'J',width:8},{key:'K',width:8}];
   }
 
-  if (!playersRaw.length) throw new Error('No se detectaron líneas de jugadores');
+  function sumTeamPresentStats(players){ var acc={points:0,aces:0,scratches:0,palos:0}; for(var i=0;i<players.length;i++){ var p=players[i]; if(!p.absent){ acc.points+=p.points; acc.aces+=p.aces; acc.scratches+=p.scratches; acc.palos+=p.palos; } } return acc; }
+  function accumTeam(dst, part){ dst.points+=part.points; dst.aces+=part.aces; dst.scratches+=part.scratches; dst.palos+=part.palos; }
 
-  // 4) Asignación a equipos con corte por rotura de orden alfabético
-  const teamAPlayers = [];
-  const teamBPlayers = [];
-
-  let switched = false;
-  let prevNick = playersRaw[0].nick;
-  teamAPlayers.push(playersRaw[0]);
-
-  for (let i = 1; i < playersRaw.length; i++) {
-    const curr = playersRaw[i];
-    if (!switched) {
-      if (cmpNick(curr.nick, prevNick) < 0) {
-        switched = true; // a partir de aquí, equipo B
-      }
-    }
-    (switched ? teamBPlayers : teamAPlayers).push(curr);
-    prevNick = curr.nick;
-  }
-
-  // 5) Construimos estructura de match
-  return {
-    teams: [
-      { name: team1.name, points: team1.points, players: teamAPlayers },
-      { name: team2.name, points: team2.points, players: teamBPlayers },
-    ],
-  };
-}
-
-// ======= Procesar múltiples logs y generar Excel =======
-async function procesarLogsAGenerarExcel(fileList) {
-  if (!fileList || !fileList.length) {
-    alert('Selecciona al menos un archivo .txt');
-    return;
-  }
-
-  const matches = [];
-  const files = Array.from(fileList);
-
-  for (const file of files) {
-    const text = await file.text();
-    try {
-      const match = parseLogTextToMatch(text);
-      match.filename = file.name;
-      matches.push(match);
-    } catch (err) {
-      console.error('Error en', file.name, err);
-      alert(`Error parseando ${file.name}: ${err.message}`);
-    }
-  }
-
-  if (!matches.length) {
-    alert('No se pudo parsear ninguna partida.');
-    return;
-  }
-
-  const wb = await buildWorkbookFromMatches(matches);
-  await downloadWorkbook(wb, `TrivialIRC_${fechaYmdHms()}.xlsx`);
-}
-
-function fechaYmdHms(d = new Date()) {
-  const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-
-// ======= Excel: construcción de libro y hojas =======
-async function buildWorkbookFromMatches(matches) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Trivial-IRC V1.5';
-  workbook.created = new Date();
-
-  // Hoja por partida
-  matches.forEach((m, idx) => {
-    generateJornadaSheet(workbook, m, idx + 1);
-  });
-
-  // Totales
-  generateTotalsSheet(workbook, matches);
-
-  return workbook;
-}
-
-function setAllBorders(cell) {
-  cell.border = {
-    top: { style: 'thin' },
-    left: { style: 'thin' },
-    bottom: { style: 'thin' },
-    right: { style: 'thin' },
-  };
-}
-
-function styleHeader(cell) {
-  cell.font = { bold: true };
-  cell.alignment = { vertical: 'middle', horizontal: 'center' };
-}
-
-function styleCenter(cell) {
-  cell.alignment = { vertical: 'middle', horizontal: 'center' };
-}
-
-function styleLeft(cell) {
-  cell.alignment = { vertical: 'middle', horizontal: 'left' };
-}
-
-function generateJornadaSheet(workbook, match, ordinal) {
-  const ws = workbook.addWorksheet(`Jornada ${ordinal}`);
-
-  // Encabezado grande con nombres de equipos y marcador
-  ws.mergeCells('A1', 'E1');
-  ws.mergeCells('G1', 'K1');
-
-  ws.getCell('A1').value = `${match.teams[0].name} (${match.teams[0].points})`;
-  ws.getCell('G1').value = `${match.teams[1].name} (${match.teams[1].points})`;
-  styleHeader(ws.getCell('A1'));
-  styleHeader(ws.getCell('G1'));
-
-  // Cabeceras de tabla por equipo: Nick, Puntos, Aces, Scr, Palos
-  const headers = ['Nick', 'Puntos', 'Aces', 'Scr', 'Palos'];
-  ws.getRow(3).values = ['Nick', 'Puntos', 'Aces', 'Scr', 'Palos', '', 'Nick', 'Puntos', 'Aces', 'Scr', 'Palos'];
-  for (let c of ['A3','B3','C3','D3','E3','G3','H3','I3','J3','K3']) {
-    styleHeader(ws.getCell(c));
-    setAllBorders(ws.getCell(c));
-  }
-
-  // Determinar número de filas (máximo entre ambos equipos)
-  const rows = Math.max(match.teams[0].players.length, match.teams[1].players.length);
-
-  for (let i = 0; i < rows; i++) {
-    const r = 4 + i;
-    const pA = match.teams[0].players[i];
-    const pB = match.teams[1].players[i];
-
-    // Equipo A en columnas A–E
-    if (pA) {
-      const absentMark = pA.absent ? '-' : null;
-      ws.getCell(`A${r}`).value = pA.nick;
-      ws.getCell(`B${r}`).value = pA.absent ? absentMark : pA.points;
-      ws.getCell(`C${r}`).value = pA.absent ? absentMark : pA.aces;
-      ws.getCell(`D${r}`).value = pA.absent ? absentMark : pA.scratches;
-      ws.getCell(`E${r}`).value = pA.absent ? absentMark : pA.palos;
-    }
-    // Equipo B en columnas G–K
-    if (pB) {
-      const absentMark = pB.absent ? '-' : null;
-      ws.getCell(`G${r}`).value = pB.nick;
-      ws.getCell(`H${r}`).value = pB.absent ? absentMark : pB.points;
-      ws.getCell(`I${r}`).value = pB.absent ? absentMark : pB.aces;
-      ws.getCell(`J${r}`).value = pB.absent ? absentMark : pB.scratches;
-      ws.getCell(`K${r}`).value = pB.absent ? absentMark : pB.palos;
-    }
-
-    // Estilos
-    for (const col of ['A','B','C','D','E','G','H','I','J','K']) {
-      const cell = ws.getCell(`${col}${r}`);
-      setAllBorders(cell);
-      if (col === 'A' || col === 'G') styleLeft(cell); else styleCenter(cell);
-    }
-  }
-
-  // Ajuste de anchos
-  ws.columns = [
-    { key: 'A', width: 22 },
-    { key: 'B', width: 10 },
-    { key: 'C', width: 8 },
-    { key: 'D', width: 8 },
-    { key: 'E', width: 8 },
-    { key: 'F', width: 2 },
-    { key: 'G', width: 22 },
-    { key: 'H', width: 10 },
-    { key: 'I', width: 8 },
-    { key: 'J', width: 8 },
-    { key: 'K', width: 8 },
-  ];
-}
-
-// ======= Totales y métricas =======
-function generateTotalsSheet(workbook, matches) {
-  const ws = workbook.addWorksheet('Totales Liga');
-
-  // Acumulados por jugador
-  const byPlayer = new Map(); // nick -> {team: lastTeam, games, points, aces, scratches, palos}
-  // Acumulados por equipo y SCO por partido
-  const teamNames = new Set();
-  const byTeam = new Map(); // team -> {games, wins, draws, losses, points, aces, scratches, palos, scoPuntos, scoScratches}
-
-  const ensureTeam = (name) => {
-    if (!byTeam.has(name)) byTeam.set(name, { games:0, wins:0, draws:0, losses:0, points:0, aces:0, scratches:0, palos:0, scoPuntos:0, scoScratches:0 });
-    teamNames.add(name);
-    return byTeam.get(name);
-  };
-
-  for (const match of matches) {
-    const [A, B] = match.teams;
-    const teamA = ensureTeam(A.name);
-    const teamB = ensureTeam(B.name);
-
-    // Totales de equipo en este partido
-    const totA = sumTeamPresentStats(A.players);
-    const totB = sumTeamPresentStats(B.players);
-
-    teamA.games++; teamB.games++;
-    // Resultado por puntos (marcador del archivo ya trae puntos de equipo)
-    if (A.points > B.points) { teamA.wins++; teamB.losses++; }
-    else if (A.points < B.points) { teamB.wins++; teamA.losses++; }
-    else { teamA.draws++; teamB.draws++; }
-
-    // SCO por Puntos (2 equipos): 3-1, empate 2-2
-    if (A.points > B.points) { teamA.scoPuntos += 3; teamB.scoPuntos += 1; }
-    else if (A.points < B.points) { teamB.scoPuntos += 3; teamA.scoPuntos += 1; }
-    else { teamA.scoPuntos += 2; teamB.scoPuntos += 2; }
-
-    // SCO por Scratches (2 equipos) basado en totales de scratches del partido
-    if (totA.scratches > totB.scratches) { teamA.scoScratches += 3; teamB.scoScratches += 1; }
-    else if (totA.scratches < totB.scratches) { teamB.scoScratches += 3; teamA.scoScratches += 1; }
-    else { teamA.scoScratches += 2; teamB.scoScratches += 2; }
-
-    // Acumular contadores de equipo
-    accumTeam(teamA, totA);
-    accumTeam(teamB, totB);
-
-    // Jugadores
-    for (const t of match.teams) {
-      for (const p of t.players) {
-        if (!byPlayer.has(p.nick)) {
-          byPlayer.set(p.nick, { team: t.name, games: 0, points: 0, aces: 0, scratches: 0, palos: 0 });
-        }
-        const rec = byPlayer.get(p.nick);
-        rec.team = t.name; // último equipo visto
-        if (!p.absent) {
-          rec.games++;
-          rec.points += p.points;
-          rec.aces += p.aces;
-          rec.scratches += p.scratches;
-          rec.palos += p.palos;
-        }
-      }
-    }
-  }
-
-  // ---- Hoja: Totales por jugador ----
-  ws.mergeCells('A1','G1');
-  ws.getCell('A1').value = 'Totales por jugador (solo partidos presentes)';
-  styleHeader(ws.getCell('A1'));
-
-  ws.getRow(3).values = ['Nick','Equipo','PJ','Pts','Aces','Scr','Palos'];
-  ['A3','B3','C3','D3','E3','F3','G3'].forEach(c=>{ styleHeader(ws.getCell(c)); setAllBorders(ws.getCell(c)); });
-
-  let r = 4;
-  const playersSorted = Array.from(byPlayer.entries()).sort((a,b)=>{
-    // Orden por puntos totales desc, luego nick asc
-    const pa = a[1].points, pb = b[1].points;
-    if (pb !== pa) return pb - pa;
-    return cmpNick(a[0], b[0]);
-  });
-
-  for (const [nick, rec] of playersSorted) {
-    ws.getCell(`A${r}`).value = nick; styleLeft(ws.getCell(`A${r}`));
-    ws.getCell(`B${r}`).value = rec.team; styleLeft(ws.getCell(`B${r}`));
-    ws.getCell(`C${r}`).value = rec.games; styleCenter(ws.getCell(`C${r}`));
-    ws.getCell(`D${r}`).value = rec.points; styleCenter(ws.getCell(`D${r}`));
-    ws.getCell(`E${r}`).value = rec.aces; styleCenter(ws.getCell(`E${r}`));
-    ws.getCell(`F${r}`).value = rec.scratches; styleCenter(ws.getCell(`F${r}`));
-    ws.getCell(`G${r}`).value = rec.palos; styleCenter(ws.getCell(`G${r}`));
-    ['A','B','C','D','E','F','G'].forEach(col => setAllBorders(ws.getCell(`${col}${r}`)));
-    r++;
-  }
-
-  // Anchos
-  ws.columns = [
-    { key: 'A', width: 26 },
-    { key: 'B', width: 20 },
-    { key: 'C', width: 6 },
-    { key: 'D', width: 8 },
-    { key: 'E', width: 8 },
-    { key: 'F', width: 8 },
-    { key: 'G', width: 8 },
-  ];
-
-  // ---- Hoja: Totales por equipo (otra worksheet) ----
-  const ws2 = workbook.addWorksheet('Resumen Equipos');
-  ws2.mergeCells('A1','J1');
-  ws2.getCell('A1').value = 'Resumen por Equipo';
-  styleHeader(ws2.getCell('A1'));
-
-  ws2.getRow(3).values = ['Equipo','PJ','G','E','P','Pts (sum)','Aces','Scr','Palos','SCO Pts','SCO Scr'];
-  ['A3','B3','C3','D3','E3','F3','G3','H3','I3','J3','K3'].forEach(c=>{ styleHeader(ws2.getCell(c)); setAllBorders(ws2.getCell(c)); });
-
-  let r2 = 4;
-  const teamsSorted = Array.from(byTeam.entries()).sort((a,b)=> a[0].localeCompare(b[0],'es',{sensitivity:'base'}));
-  for (const [team, rec] of teamsSorted) {
-    ws2.getCell(`A${r2}`).value = team; styleLeft(ws2.getCell(`A${r2}`));
-    ws2.getCell(`B${r2}`).value = rec.games; styleCenter(ws2.getCell(`B${r2}`));
-    ws2.getCell(`C${r2}`).value = rec.wins; styleCenter(ws2.getCell(`C${r2}`));
-    ws2.getCell(`D${r2}`).value = rec.draws; styleCenter(ws2.getCell(`D${r2}`));
-    ws2.getCell(`E${r2}`).value = rec.losses; styleCenter(ws2.getCell(`E${r2}`));
-    ws2.getCell(`F${r2}`).value = rec.points; styleCenter(ws2.getCell(`F${r2}`));
-    ws2.getCell(`G${r2}`).value = rec.aces; styleCenter(ws2.getCell(`G${r2}`));
-    ws2.getCell(`H${r2}`).value = rec.scratches; styleCenter(ws2.getCell(`H${r2}`));
-    ws2.getCell(`I${r2}`).value = rec.palos; styleCenter(ws2.getCell(`I${r2}`));
-    ws2.getCell(`J${r2}`).value = rec.scoPuntos; styleCenter(ws2.getCell(`J${r2}`));
-    ws2.getCell(`K${r2}`).value = rec.scoScratches; styleCenter(ws2.getCell(`K${r2}`));
-    ['A','B','C','D','E','F','G','H','I','J','K'].forEach(col => setAllBorders(ws2.getCell(`${col}${r2}`)));
-    r2++;
-  }
-
-  ws2.columns = [
-    { key: 'A', width: 24 },
-    { key: 'B', width: 6 },
-    { key: 'C', width: 6 },
-    { key: 'D', width: 6 },
-    { key: 'E', width: 6 },
-    { key: 'F', width: 10 },
-    { key: 'G', width: 8 },
-    { key: 'H', width: 8 },
-    { key: 'I', width: 8 },
-    { key: 'J', width: 9 },
-    { key: 'K', width: 9 },
-  ];
-
-  // ---- Hoja: Medias por jugador (opcional útil) ----
-  const ws3 = workbook.addWorksheet('Medias Jugador');
-  ws3.mergeCells('A1','G1');
-  ws3.getCell('A1').value = 'Medias por jugador (solo presentes)';
-  styleHeader(ws3.getCell('A1'));
-  ws3.getRow(3).values = ['Nick','Equipo','PJ','Pts/Part','Scr/Part','Aces/Part','Palos/Part'];
-  ['A3','B3','C3','D3','E3','F3','G3'].forEach(c=>{ styleHeader(ws3.getCell(c)); setAllBorders(ws3.getCell(c)); });
-
-  let r3 = 4;
-  for (const [nick, rec] of playersSorted) {
-    const pj = rec.games || 0;
-    const div = pj || 1;
-    ws3.getCell(`A${r3}`).value = nick; styleLeft(ws3.getCell(`A${r3}`));
-    ws3.getCell(`B${r3}`).value = rec.team; styleLeft(ws3.getCell(`B${r3}`));
-    ws3.getCell(`C${r3}`).value = pj; styleCenter(ws3.getCell(`C${r3}`));
-    ws3.getCell(`D${r3}`).value = +(rec.points / div).toFixed(2); styleCenter(ws3.getCell(`D${r3}`));
-    ws3.getCell(`E${r3}`).value = +(rec.scratches / div).toFixed(2); styleCenter(ws3.getCell(`E${r3}`));
-    ws3.getCell(`F${r3}`).value = +(rec.aces / div).toFixed(2); styleCenter(ws3.getCell(`F${r3}`));
-    ws3.getCell(`G${r3}`).value = +(rec.palos / div).toFixed(2); styleCenter(ws3.getCell(`G${r3}`));
-    ['A','B','C','D','E','F','G'].forEach(col => setAllBorders(ws3.getCell(`${col}${r3}`)));
-    r3++;
-  }
-
-  ws3.columns = [
-    { key: 'A', width: 26 },
-    { key: 'B', width: 20 },
-    { key: 'C', width: 6 },
-    { key: 'D', width: 9 },
-    { key: 'E', width: 9 },
-    { key: 'F', width: 10 },
-    { key: 'G', width: 10 },
-  ];
-}
-
-function sumTeamPresentStats(players) {
-  const acc = { points:0, aces:0, scratches:0, palos:0 };
-  for (const p of players) {
-    if (!p.absent) {
-      acc.points += p.points;
-      acc.aces += p.aces;
-      acc.scratches += p.scratches;
-      acc.palos += p.palos;
-    }
-  }
-  return acc;
-}
-
-function accumTeam(dst, part) {
-  dst.points += part.points;
-  dst.aces += part.aces;
-  dst.scratches += part.scratches;
-  dst.palos += part.palos;
-}
-
-// ======= Descargar workbook =======
-async function downloadWorkbook(workbook, filename = 'TrivialIRC.xlsx') {
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-// ======= Auto-enlazado básico si existen los elementos en DOM =======
-(function autoBind() {
-  const btn = document.getElementById('btnProcesarLogs');
-  const input = document.getElementById('fileInputLogs');
-  if (btn && input) {
-    btn.addEventListener('click', () => {
-      procesarLogsAGenerarExcel(input.files);
+  function generateTotalsSheet(workbook, matches){
+    var ws=workbook.addWorksheet('Totales Liga');
+    var byPlayer=new Map(); var byTeam=new Map();
+    function ensureTeam(name){ if(!byTeam.has(name)) byTeam.set(name,{games:0,wins:0,draws:0,losses:0,points:0,aces:0,scratches:0,palos:0,scoPuntos:0,scoScratches:0}); return byTeam.get(name); }
+    matches.forEach(function(match){
+      var A=match.teams[0], B=match.teams[1]; var ta=ensureTeam(A.name), tb=ensureTeam(B.name);
+      var totA=sumTeamPresentStats(A.players), totB=sumTeamPresentStats(B.players);
+      ta.games++; tb.games++;
+      if(A.points>B.points){ ta.wins++; tb.losses++; } else if(A.points<B.points){ tb.wins++; ta.losses++; } else { ta.draws++; tb.draws++; }
+      if(A.points>B.points){ ta.scoPuntos+=3; tb.scoPuntos+=1; } else if(A.points<B.points){ tb.scoPuntos+=3; ta.scoPuntos+=1; } else { ta.scoPuntos+=2; tb.scoPuntos+=2; }
+      if(totA.scratches>totB.scratches){ ta.scoScratches+=3; tb.scoScratches+=1; } else if(totA.scratches<totB.scratches){ tb.scoScratches+=3; ta.scoScratches+=1; } else { ta.scoScratches+=2; tb.scoScratches+=2; }
+      accumTeam(ta, totA); accumTeam(tb, totB);
+      match.teams.forEach(function(t){ t.players.forEach(function(p){ if(!byPlayer.has(p.nick)) byPlayer.set(p.nick,{team:t.name,games:0,points:0,aces:0,scratches:0,palos:0}); var rec=byPlayer.get(p.nick); rec.team=t.name; if(!p.absent){ rec.games++; rec.points+=p.points; rec.aces+=p.aces; rec.scratches+=p.scratches; rec.palos+=p.palos; } }); });
     });
+    ws.mergeCells('A1','G1'); ws.getCell('A1').value='Totales por jugador (solo presentes)'; styleHeader(ws.getCell('A1'));
+    ws.getRow(3).values=['Nick','Equipo','PJ','Pts','Aces','Scr','Palos']; ['A3','B3','C3','D3','E3','F3','G3'].forEach(function(c){ styleHeader(ws.getCell(c)); setAllBorders(ws.getCell(c)); });
+    var r=4; var playersSorted=Array.from(byPlayer.entries()).sort(function(a,b){ var pa=a[1].points, pb=b[1].points; if(pb!==pa) return pb-pa; return cmpNick(a[0],b[0]); });
+    playersSorted.forEach(function(entry){ var nick=entry[0], rec=entry[1]; ws.getCell('A'+r).value=nick; styleLeft(ws.getCell('A'+r)); ws.getCell('B'+r).value=rec.team; styleLeft(ws.getCell('B'+r)); ws.getCell('C'+r).value=rec.games; styleCenter(ws.getCell('C'+r)); ws.getCell('D'+r).value=rec.points; styleCenter(ws.getCell('D'+r)); ws.getCell('E'+r).value=rec.aces; styleCenter(ws.getCell('E'+r)); ws.getCell('F'+r).value=rec.scratches; styleCenter(ws.getCell('F'+r)); ws.getCell('G'+r).value=rec.palos; styleCenter(ws.getCell('G'+r)); ['A','B','C','D','E','F','G'].forEach(function(col){ setAllBorders(ws.getCell(col+String(r))); }); r++; });
+    ws.columns=[{key:'A',width:26},{key:'B',width:20},{key:'C',width:6},{key:'D',width:8},{key:'E',width:8},{key:'F',width:8},{key:'G',width:8}];
+    var ws2=workbook.addWorksheet('Resumen Equipos'); ws2.mergeCells('A1','J1'); ws2.getCell('A1').value='Resumen por Equipo'; styleHeader(ws2.getCell('A1'));
+    ws2.getRow(3).values=['Equipo','PJ','G','E','P','Pts (sum)','Aces','Scr','Palos','SCO Pts','SCO Scr']; ['A3','B3','C3','D3','E3','F3','G3','H3','I3','J3','K3'].forEach(function(c){ styleHeader(ws2.getCell(c)); setAllBorders(ws2.getCell(c)); });
+    var r2=4; var teamsSorted=Array.from(byTeam.entries()).sort(function(a,b){ return a[0].localeCompare(b[0],'es',{sensitivity:'base'}); });
+    teamsSorted.forEach(function(entry){ var team=entry[0], rec=entry[1]; ws2.getCell('A'+r2).value=team; styleLeft(ws2.getCell('A'+r2)); ws2.getCell('B'+r2).value=rec.games; styleCenter(ws2.getCell('B'+r2)); ws2.getCell('C'+r2).value=rec.wins; styleCenter(ws2.getCell('C'+r2)); ws2.getCell('D'+r2).value=rec.draws; styleCenter(ws2.getCell('D'+r2)); ws2.getCell('E'+r2).value=rec.losses; styleCenter(ws2.getCell('E'+r2)); ws2.getCell('F'+r2).value=rec.points; styleCenter(ws2.getCell('F'+r2)); ws2.getCell('G'+r2).value=rec.aces; styleCenter(ws2.getCell('G'+r2)); ws2.getCell('H'+r2).value=rec.scratches; styleCenter(ws2.getCell('H'+r2)); ws2.getCell('I'+r2).value=rec.palos; styleCenter(ws2.getCell('I'+r2)); ws2.getCell('J'+r2).value=rec.scoPuntos; styleCenter(ws2.getCell('J'+r2)); ws2.getCell('K'+r2).value=rec.scoScratches; styleCenter(ws2.getCell('K'+r2)); ['A','B','C','D','E','F','G','H','I','J','K'].forEach(function(col){ setAllBorders(ws2.getCell(col+String(r2))); }); r2++; });
+    ws2.columns=[{key:'A',width:24},{key:'B',width:6},{key:'C',width:6},{key:'D',width:6},{key:'E',width:6},{key:'F',width:10},{key:'G',width:8},{key:'H',width:8},{key:'I',width:8},{key:'J',width:9},{key:'K',width:9}];
+    var ws3=workbook.addWorksheet('Medias Jugador'); ws3.mergeCells('A1','G1'); ws3.getCell('A1').value='Medias por jugador (solo presentes)'; styleHeader(ws3.getCell('A1'));
+    ws3.getRow(3).values=['Nick','Equipo','PJ','Pts/Part','Scr/Part','Aces/Part','Palos/Part']; ['A3','B3','C3','D3','E3','F3','G3'].forEach(function(c){ styleHeader(ws3.getCell(c)); setAllBorders(ws3.getCell(c)); });
+    var r3=4; playersSorted.forEach(function(entry){ var nick=entry[0], rec=entry[1]; var pj=rec.games||0, div=pj||1; ws3.getCell('A'+r3).value=nick; styleLeft(ws3.getCell('A'+r3)); ws3.getCell('B'+r3).value=rec.team; styleLeft(ws3.getCell('B'+r3)); ws3.getCell('C'+r3).value=pj; styleCenter(ws3.getCell('C'+r3)); ws3.getCell('D'+r3).value=+(rec.points/div).toFixed(2); styleCenter(ws3.getCell('D'+r3)); ws3.getCell('E'+r3).value=+(rec.scratches/div).toFixed(2); styleCenter(ws3.getCell('E'+r3)); ws3.getCell('F'+r3).value=+(rec.aces/div).toFixed(2); styleCenter(ws3.getCell('F'+r3)); ws3.getCell('G'+r3).value=+(rec.palos/div).toFixed(2); styleCenter(ws3.getCell('G'+r3)); ['A','B','C','D','E','F','G'].forEach(function(col){ setAllBorders(ws3.getCell(col+String(r3))); }); r3++; });
+    ws3.columns=[{key:'A',width:26},{key:'B',width:20},{key:'C',width:6},{key:'D',width:9},{key:'E',width:9},{key:'F',width:10},{key:'G',width:10}];
   }
-})();
 
+  // ========= Flujo UI =========
+  var $ = function(sel){ return document.querySelector(sel); };
+  var results = $('#results');
+  var downloadSection = $('#downloadSection');
+  var btnDownload = $('#downloadBtn');
+
+  function showMsg(html, cls){ results.style.display='block'; results.innerHTML = '<div class="msg '+cls+'">'+html+'</div>'; }
+
+  async function processJornada(){
+    var input = $('#fileInputJornada');
+    if(!input.files || !input.files.length){ showMsg('Selecciona al menos un log (.txt).','error'); return; }
+    var matches=[];
+    for(var i=0;i<input.files.length;i++){
+      var file = input.files[i];
+      var text = await file.text();
+      try{ var match = parseLogTextToMatch(text); match.filename=file.name; matches.push(match); }
+      catch(err){ console.error(err); showMsg('Error parseando '+file.name+': '+err.message,'error'); }
+    }
+    if(!matches.length){ showMsg('No se pudo parsear ninguna partida.','error'); return; }
+    var wb = await buildWorkbookFromMatches(matches); __lastWorkbook = wb;
+    showMsg('✅ '+matches.length+' partida(s) procesadas. Puedes descargar el Excel.', 'success');
+    downloadSection.style.display='block';
+  }
+
+  async function downloadExcel(){
+    if(!__lastWorkbook){ showMsg('Primero procesa una jornada.','error'); return; }
+    var buffer = await __lastWorkbook.xlsx.writeBuffer();
+    var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var url = URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='TrivialIRC_'+fechaYmdHms()+'.xlsx'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+
+  async function processTotales(){
+    showMsg('La agregación de Totales desde .xlsx se integra si lo necesitas. Ahora mismo este botón es informativo porque el flujo recomendado es: generar el Excel de la jornada con los logs y usar ese mismo archivo como acumulado.', 'error');
+  }
+
+  function fechaYmdHms(d){ d=d||new Date(); var p=function(n){ return String(n).padStart(2,'0'); }; return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds()); }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var inJ = $('#fileInputJornada'); var inT=$('#fileInputTotales');
+    var bJ = $('#processJornadaBtn'); var bT=$('#processTotalesBtn');
+    if(inJ) inJ.addEventListener('change', function(){ bJ.disabled = !(inJ.files && inJ.files.length); });
+    if(inT) inT.addEventListener('change', function(){ bT.disabled = !(inT.files && inT.files.length); });
+    if(bJ) bJ.addEventListener('click', processJornada);
+    if(bT) bT.addEventListener('click', processTotales);
+    if(btnDownload) btnDownload.addEventListener('click', downloadExcel);
+  });
+  </script>
 </body>
 </html>

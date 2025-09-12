@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.2</title>
+  <title>Procesador de Logs de Trivial IRC — V4.3</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -340,20 +340,17 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ===== Totales/Medias con SCO =====
+    // ===== Totales/Medias con SCO (sólo en PUNTOS y SCRATCHES) + corte Top‑33 =====
     function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
 
-      // Preparar mapas auxiliares para SCO por partido (puntos y scratches)
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
 
       processedData.forEach(match => {
-        // Inicializar equipos del match
         match.teamOrder.forEach(teamName => {
           if (!teamTotals[teamName]) teamTotals[teamName] = { name:teamName, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,totalAsistencia:0,gamesPlayed:0, scoPuntos:0, scoScratches:0 };
         });
 
-        // SCO por PUNTOS (marcador de equipos)
         if (match.teamOrder.length >= 2){
           const A = match.teamOrder[0], B = match.teamOrder[1];
           const pA = +(match.teams[A] || 0), pB = +(match.teams[B] || 0);
@@ -361,7 +358,6 @@
           teamTotals[A].scoPuntos += sA; teamTotals[B].scoPuntos += sB;
         }
 
-        // Agregados por equipo del match (puntos + asistencia + stats + scratches para SCO)
         const scratchesByTeam = {};
         match.teamOrder.forEach(teamName => {
           teamTotals[teamName].totalPoints += match.teams[teamName] || 0;
@@ -377,7 +373,6 @@
           scratchesByTeam[teamName] = scrSum;
         });
 
-        // SCO por SCRATCHES (comparando totales de scratches del partido)
         if (match.teamOrder.length >= 2){
           const A = match.teamOrder[0], B = match.teamOrder[1];
           const sA = scratchesByTeam[A] || 0, sB = scratchesByTeam[B] || 0;
@@ -385,7 +380,6 @@
           teamTotals[A].scoScratches += sa; teamTotals[B].scoScratches += sb;
         }
 
-        // Jugadores
         match.players.forEach(p=>{
           if (!p.absent){
             if (!playerTotals[p.name]) playerTotals[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
@@ -409,7 +403,7 @@
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
-      // === Bloques de jugadores (sin cambios estructurales) ===
+      // === Bloques de jugadores (títulos desplazados) ===
       const pBlocks = [
         { title:'PUNTOS',     baseCol:2,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
         { title:'POSTES',     baseCol:7,  sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
@@ -418,92 +412,108 @@
       ];
 
       pBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+2).value = b.title; // título desplazado 1 col dcha
+        ws.getCell(1, b.baseCol+2).value = b.title; // título una col a la dcha
         ws.getCell(2, b.baseCol).value = 'NOMBRE';
         ws.getCell(2, b.baseCol+1).value = 'TOT';
         ws.getCell(2, b.baseCol+2).value = 'JUG';
         ws.getCell(2, b.baseCol+3).value = 'AVG';
-        // Alineación cabecera numérica a la derecha
         ws.getCell(2, b.baseCol+1).alignment = { horizontal: 'right' };
         ws.getCell(2, b.baseCol+2).alignment = { horizontal: 'right' };
         ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
 
         const data = [...players].sort(b.sort);
+        let extraOffset = 0; // fila vacía tras Top-33
         data.forEach((p, idx)=>{
-          const row = idx + 3; const colors = getTeamColors(p.team);
+          const row = 3 + idx + extraOffset;
+          if (idx === 32) { // tras el 33º
+            // Dejamos la fila actual para el jugador 33 y a partir de aquí metemos offset
+            // Añadimos una fila vacía justo después escribiendo el 34º en row+1
+            extraOffset = 1;
+          }
+          const colors = getTeamColors(p.team);
           const nameCell = ws.getCell(row, b.baseCol);
-          nameCell.value = p.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } }; nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          nameCell.value = p.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
+          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
           const [tot,gp,avg] = b.pick(p);
-          ws.getCell(row, b.baseCol+1).value = tot;
-          ws.getCell(row, b.baseCol+2).value = gp;
-          ws.getCell(row, b.baseCol+3).value = avg;
-          ws.getCell(row, b.baseCol+1).alignment = { horizontal: 'right' };
-          ws.getCell(row, b.baseCol+2).alignment = { horizontal: 'right' };
-          ws.getCell(row, b.baseCol+3).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+1).value = tot; ws.getCell(row, b.baseCol+1).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+2).value = gp;  ws.getCell(row, b.baseCol+2).alignment = { horizontal: 'right' };
+          ws.getCell(row, b.baseCol+3).value = avg; ws.getCell(row, b.baseCol+3).alignment = { horizontal: 'right' };
         });
       });
 
-      // Separación visual
+      // Separación visual amplia entre jugadores y equipos
       ws.getCell(1, 22).value = '';
 
-      // === Bloques de equipos con SCO (SCO antes de TOT) ===
+      // === Bloques de equipos ===
+      // hasSco => sólo para PUNTOS y SCRATCHES
       const tBlocks = [
-        // baseCol = columna del NOMBRE. Númericas: SCO, TOT, JUG, AVG
-        { title:'PUNTOS',     baseCol:24, sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>[t.scoPuntos||0,    t.totalPoints, t.gamesPlayed, +t.avgPoints.toFixed(1)] },
-        { title:'POSTES',     baseCol:30, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>[null,               t.totalPalos,  t.gamesPlayed, +t.avgPalos.toFixed(1)] },
-        { title:'SCRATCHES',  baseCol:36, sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>[t.scoScratches||0, t.totalScratches, t.gamesPlayed, +t.avgScratches.toFixed(1)] },
-        { title:'ACES',       baseCol:42, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(t)=>[null,               t.totalAces,   t.gamesPlayed, +t.avgAces.toFixed(1)] },
-        { title:'ASISTENCIA', baseCol:48, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>[null,              t.totalAsistencia, t.gamesPlayed, +t.avgAsistencia.toFixed(1)] }
+        { title:'PUNTOS',     baseCol:24, hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,   jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
+        { title:'POSTES',     baseCol:30, hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>({ tot:t.totalPalos,     jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:36, hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'ACES',       baseCol:42, hasSco:false, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(t)=>({ tot:t.totalAces,      jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
+        { title:'ASISTENCIA', baseCol:48, hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
       ];
 
       tBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+2).value = b.title; // título desplazado
+        // Título (una col a la dcha del nombre)
+        ws.getCell(1, b.baseCol+2).value = b.title;
+        // Cabeceras
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
-        ws.getCell(2, b.baseCol+1).value = 'SCO';
-        ws.getCell(2, b.baseCol+2).value = 'TOT';
-        ws.getCell(2, b.baseCol+3).value = 'JUG';
-        ws.getCell(2, b.baseCol+4).value = 'AVG';
-        // Alineación cabecera numérica a la derecha
-        ws.getCell(2, b.baseCol+1).alignment = { horizontal: 'right' };
-        ws.getCell(2, b.baseCol+2).alignment = { horizontal: 'right' };
-        ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
-        ws.getCell(2, b.baseCol+4).alignment = { horizontal: 'right' };
+        if (b.hasSco){
+          ws.getCell(2, b.baseCol+1).value = 'SCO';
+          ws.getCell(2, b.baseCol+2).value = 'TOT';
+          ws.getCell(2, b.baseCol+3).value = 'JUG';
+          ws.getCell(2, b.baseCol+4).value = 'AVG';
+          [1,2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        } else {
+          ws.getCell(2, b.baseCol+1).value = 'TOT';
+          ws.getCell(2, b.baseCol+2).value = 'JUG';
+          ws.getCell(2, b.baseCol+3).value = 'AVG';
+          [1,2,3].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        }
 
         const data = [...teams].sort(b.sort);
         data.forEach((t, idx)=>{
-          const row = idx + 3; const colors = getTeamColors(t.name);
+          const row = idx + 3;
+          const colors = getTeamColors(t.name);
           const nameCell = ws.getCell(row, b.baseCol);
-          nameCell.value = t.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } }; nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
-          const [sco, tot, gp, avg] = b.pick(t);
-          if (sco != null) { ws.getCell(row, b.baseCol+1).value = sco; ws.getCell(row, b.baseCol+1).alignment = { horizontal: 'right' }; }
-          ws.getCell(row, b.baseCol+2).value = tot; ws.getCell(row, b.baseCol+2).alignment = { horizontal: 'right' };
-          ws.getCell(row, b.baseCol+3).value = gp;  ws.getCell(row, b.baseCol+3).alignment = { horizontal: 'right' };
-          ws.getCell(row, b.baseCol+4).value = avg; ws.getCell(row, b.baseCol+4).alignment = { horizontal: 'right' };
+          nameCell.value = t.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
+          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          const vals = b.pick(t);
+          if (b.hasSco){
+            ws.getCell(row, b.baseCol+1).value = vals.sco; ws.getCell(row, b.baseCol+1).alignment = { horizontal:'right' };
+            ws.getCell(row, b.baseCol+2).value = vals.tot; ws.getCell(row, b.baseCol+2).alignment = { horizontal:'right' };
+            ws.getCell(row, b.baseCol+3).value = vals.jug; ws.getCell(row, b.baseCol+3).alignment = { horizontal:'right' };
+            ws.getCell(row, b.baseCol+4).value = vals.avg; ws.getCell(row, b.baseCol+4).alignment = { horizontal:'right' };
+          } else {
+            ws.getCell(row, b.baseCol+1).value = vals.tot; ws.getCell(row, b.baseCol+1).alignment = { horizontal:'right' };
+            ws.getCell(row, b.baseCol+2).value = vals.jug; ws.getCell(row, b.baseCol+2).alignment = { horizontal:'right' };
+            ws.getCell(row, b.baseCol+3).value = vals.avg; ws.getCell(row, b.baseCol+3).alignment = { horizontal:'right' };
+          }
         });
       });
 
-      // Anchos + marco: ajustamos porque cada bloque de equipos ahora tiene 5 columnas contenido
+      // Anchos + marco (dejamos columnas de más si las hubiera; no molesta)
       ws.columns = [
-        // Padding inicial
         { width: 2.25 },
-        // Jugadores (4 bloques x 4 columnas + separadores = como en V4.1)
+        // Jugadores (4 bloques)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // Separadores extra
+        // Separadores
         { width: 3 }, { width: 3 },
-        // Equipos (ahora: NOMBRE + SCO + TOT + JUG + AVG + sep)
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // PUNTOS
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // POSTES (SCO vacío)
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // SCRATCHES
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 }, // ACES (SCO vacío)
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }                  // ASISTENCIA (SCO vacío)
+        // Equipos (asignamos 5 por bloque para no romper layout; las celdas sin SCO quedarán vacías)
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }
       ];
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== Parser de logs =====
+    // ===== Parser de logs (base original) =====
     function parseLogFile(content){
       const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
       const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));

@@ -29,7 +29,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
+    <h1>🎯 Procesador de Logs de Trivial IRC V4</h1>
 
     <!-- PROCESO 1: Estadísticas de la Jornada -->
     <div class="upload-section">
@@ -140,16 +140,8 @@
       }catch(err){ showError('Error procesando archivos Excel: '+err.message); }
     }
 
-    // ======= Helpers ExcelJS robustos =======
-    function xlsToString(v){
-      if (v == null) return '';
-      if (typeof v === 'string') return v;
-      if (typeof v === 'number') return String(v);
-      if (v.richText) return v.richText.map(t=>t.text).join('');
-      if (v.text) return v.text;
-      if (v.result != null) return xlsToString(v.result); // fórmulas
-      return String(v);
-    }
+    // ========= Helpers ExcelJS =========
+    function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
 
@@ -174,7 +166,7 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
-          currentRow += 14; // cada bloque ocupa 14 filas
+          currentRow += 14; // cada bloque ocupa ~14 filas
         } else { currentRow++; }
       }
       return matches;
@@ -184,8 +176,8 @@
       try{
         const teamRow = worksheet.getRow(startRow + 1);
         const teams = {}; const teamOrder = []; const players = [];
-        // Layout: [padding][NOMBRE][Puntos][Scratches][Palos][Aces][sep...]
-        // startCol apunta a "PUNTOS" ⇒ el nombre está en startCol-1
+        // Layout: [padding][NOMBRE][Puntos][Scratches][Palos][Aces][sep]
+        // startCol apunta a "PUNTOS" ⇒ el nombre está en startCol - 1
         let col = Math.max(1, startCol - 1);
         const maxC = worksheet.columnCount || 60;
         while (col <= maxC){
@@ -203,19 +195,26 @@
             const pPalos  = numOrNull(row.getCell(col + 3).value) ?? 0;
             const pAces   = numOrNull(row.getCell(col + 4).value) ?? 0;
             const absent = (pPoints === null);
-            players.push({
-              name: name.toUpperCase(), team: teamName,
-              points: absent ? null : pPoints,
-              scratches: absent ? 0 : pScr,
-              palos: absent ? 0 : pPalos,
-              aces: absent ? 0 : pAces,
-              absent
-            });
+            players.push({ name: name.toUpperCase(), team: teamName, points: absent ? null : pPoints, scratches: absent ? 0 : pScr, palos: absent ? 0 : pPalos, aces: absent ? 0 : pAces, absent });
           }
-          col += 6; // siguiente bloque de equipo (5 columnas + 1 separador)
+          col += 6; // siguiente equipo (5 datos + 1 separador)
         }
         return { teams, teamOrder, players };
       }catch(e){ console.error('extractSingleMatch error', e); return null; }
+    }
+
+    // ===== Vista previa (Totales) – AHORA DEFINIDA =====
+    function displayTotalesOnlyResults(){
+      const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML='';
+      const allPlayers = new Set(); let totalMatches = processedData.length;
+      processedData.forEach(m => m.players.forEach(p => allPlayers.add(p.name)));
+      const info = document.createElement('div'); info.className='log-info';
+      info.innerHTML = `<h3>🏆 Totales Liga Procesados</h3>
+        <p><strong>Jornadas procesadas:</strong> ${fileNames.length}</p>
+        <p><strong>Partidas totales:</strong> ${totalMatches}</p>
+        <p><strong>Jugadores únicos:</strong> ${allPlayers.size}</p>
+        <p><em>Pulsa "Descargar Excel" para generar el acumulado</em></p>`;
+      resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
     // ===== Vista previa (Jornada) =====
@@ -389,9 +388,7 @@
         data.forEach((p, idx)=>{
           const row = idx + 3; const colors = getTeamColors(p.team);
           const nameCell = ws.getCell(row, b.baseCol);
-          nameCell.value = p.name;
-          nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
-          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          nameCell.value = p.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } }; nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
           const [tot,gp,avg] = b.pick(p);
           ws.getCell(row, b.baseCol+1).value = tot;
           ws.getCell(row, b.baseCol+2).value = gp;
@@ -421,9 +418,7 @@
         data.forEach((t, idx)=>{
           const row = idx + 3; const colors = getTeamColors(t.name);
           const nameCell = ws.getCell(row, b.baseCol);
-          nameCell.value = t.name;
-          nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
-          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          nameCell.value = t.name; nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } }; nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
           const [tot,gp,avg] = b.pick(t);
           ws.getCell(row, b.baseCol+1).value = tot;
           ws.getCell(row, b.baseCol+2).value = gp;
@@ -431,7 +426,7 @@
         });
       });
 
-      // Anchos de columna (incluye padding inicial y separadores)
+      // Anchos de columna (incluye padding y separadores)
       ws.columns = [
         { width: 2.25 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
@@ -447,7 +442,7 @@
       ];
     }
 
-    // ===== Parser de logs (base V1 con mejoras de equipos de varias palabras) =====
+    // ===== Parser de logs (base V1 con mejora de equipos multi-palabra) =====
     function parseLogFile(content){
       const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
       const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));

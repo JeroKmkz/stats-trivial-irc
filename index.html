@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC</title>
+  <title>Procesador de Logs de Trivial IRC — V4 + Marco</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -29,7 +29,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🎯 Procesador de Logs de Trivial IRC V4</h1>
+    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
 
     <!-- PROCESO 1: Estadísticas de la Jornada -->
     <div class="upload-section">
@@ -57,7 +57,7 @@
   </div>
 
   <script>
-    // ===== Colores de equipos (mismos que V1) =====
+    // ===== Colores de equipos =====
     const COLORES_EQUIPOS = {
       "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
       "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
@@ -145,6 +145,21 @@
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
 
+    // Padding/Marco visual reutilizable
+    function addFraming(ws, padWidth){
+      // Añadir columna vacía al final (mismo ancho que la primera de padding)
+      if (Array.isArray(ws.columns) && ws.columns.length){
+        const width = padWidth ?? ws.columns[0]?.width ?? 3;
+        ws.columns = [...ws.columns, { width }];
+      }
+      // Fila vacía al inicio (mitad de alto)
+      ws.spliceRows(1, 0, []);
+      try { ws.getRow(1).height = 7.5; } catch {}
+      // Fila vacía al final (misma altura)
+      ws.addRow([]);
+      try { ws.getRow(ws.lastRow.number).height = 7.5; } catch {}
+    }
+
     // Busca la columna donde empieza el bloque (col del texto "PUNTOS")
     function findHeaderStartCol(row){
       const n = row.actualCellCount || row.cellCount || 100;
@@ -203,7 +218,7 @@
       }catch(e){ console.error('extractSingleMatch error', e); return null; }
     }
 
-    // ===== Vista previa (Totales) – AHORA DEFINIDA =====
+    // ===== Vista previa (Totales) =====
     function displayTotalesOnlyResults(){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML='';
       const allPlayers = new Set(); let totalMatches = processedData.length;
@@ -273,7 +288,7 @@
       try{
         const wb = new ExcelJS.Workbook();
         if (currentProcess === 'jornada'){
-          // Hoja única "Estadísticas" con TODAS las partidas apiladas (mismo layout V1)
+          // Hoja única "Estadísticas" con TODAS las partidas apiladas
           const ws = wb.addWorksheet('Estadísticas');
           let currentRow = 1;
           processedData.forEach(matchData => {
@@ -312,7 +327,14 @@
             currentRow += 14; // siguiente bloque
           });
 
-          if (processedData.length>0){ const tcount=processedData[0].teamOrder.length; const widths=[3]; for(let i=0;i<tcount;i++){ widths.push(15,8,10,8,8); if(i<tcount-1) widths.push(6); } ws.columns = widths.map(w=>({width:w})); }
+          // Anchos + marco
+          if (processedData.length>0){
+            const tcount=processedData[0].teamOrder.length;
+            const widths=[3];
+            for(let i=0;i<tcount;i++){ widths.push(15,8,10,8,8); if(i<tcount-1) widths.push(6); }
+            ws.columns = widths.map(w=>({width:w}));
+            addFraming(ws, widths[0]); // columna final + fila arriba/abajo
+          }
         } else if (currentProcess === 'totales'){
           const ws = wb.addWorksheet('Totales');
           generateTotalsSheet(ws);
@@ -426,7 +448,7 @@
         });
       });
 
-      // Anchos de columna (incluye padding y separadores)
+      // Anchos + marco
       ws.columns = [
         { width: 2.25 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
@@ -440,6 +462,7 @@
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }
       ];
+      addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
     // ===== Parser de logs (base V1 con mejora de equipos multi-palabra) =====

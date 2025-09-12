@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.5</title>
+  <title>Procesador de Logs de Trivial IRC — V4.6</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -82,8 +82,8 @@
       if (inT) inT.addEventListener('change', () => { bT.disabled = !(inT.files && inT.files.length); fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[]; currentProcess='totales'; });
     });
 
-    function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class=\"error\">${msg}</div>`; res.style.display='block'; }
-    function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class=\"success\">${msg}</div>`; res.style.display='block'; }
+    function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
+    function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 
     // ====== PROCESO 1: Jornada (desde logs .txt) ======
     function processJornada(){
@@ -95,7 +95,7 @@
         reader.onload = (e)=>{
           try{
             const content = e.target.result;
-            const data = parseLogFile(content);
+            const data = parseLogFileSymbols(content); // versión robusta con símbolos
             processedData[index] = data;
             processed++;
             if (processed === files.length){
@@ -141,6 +141,25 @@
     function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
+
+    // ====== Comparador de nicks: símbolos (^[, etc.) van antes que 'A' ======
+    function normalizeNick(nick){
+      return String(nick||'')
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}+/gu,'');
+    }
+    function nickKey(nick){
+      const s = normalizeNick(nick);
+      const first = s.charAt(0);
+      const isLetter = /^[A-ZÑ]$/.test(first);
+      return (isLetter ? '1' : '0') + s;
+    }
+    function cmpNick(a,b){
+      const A = nickKey(a), B = nickKey(b);
+      return A.localeCompare(B,'es',{sensitivity:'base',numeric:true});
+    }
 
     // Marco: fila vacía arriba/abajo y columna vacía al final
     function addFraming(ws, padWidth){
@@ -217,7 +236,7 @@
         <p><strong>Jornadas procesadas:</strong> ${fileNames.length}</p>
         <p><strong>Partidas totales:</strong> ${totalMatches}</p>
         <p><strong>Jugadores únicos:</strong> ${allPlayers.size}</p>
-        <p><em>Pulsa \"Descargar Excel\" para generar el acumulado</em></p>`;
+        <p><em>Pulsa "Descargar Excel" para generar el acumulado</em></p>`;
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
@@ -255,7 +274,7 @@
           players.forEach(p=>{
             const row = document.createElement('tr'); row.className='player-row';
             row.innerHTML = `
-              <td style=\"text-align:left;font-weight:bold;\">${p.name}</td>
+              <td style="text-align:left;font-weight:bold;">${p.name}</td>
               <td>${p.absent? '': p.points}</td>
               <td>${p.absent? '': p.scratches}</td>
               <td>${p.absent? '': p.palos}</td>
@@ -437,12 +456,8 @@
         });
       });
 
-      // Inserta UNA sola fila vacía (altura ~7.5) justo después del 33º jugador
-      if (players.length > 33){
-        const cutRow = 36; // 2 cabeceras + 33 filas = 35; insertamos en 36
-        ws.spliceRows(cutRow, 0, []);
-        try { ws.getRow(cutRow).height = 7.5; } catch {}
-      }
+      // Inserta UNA sola fila vacía (altura ~7.5) tras el 33º
+      if (players.length > 33){ const cutRow = 36; ws.spliceRows(cutRow, 0, []); try { ws.getRow(cutRow).height = 7.5; } catch {} }
 
       // === BLOQUES DE EQUIPOS (sin huecos; SCO solo en PUNTOS/SCRATCHES) ===
       const tBlocks = [
@@ -508,21 +523,26 @@
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== Parser de logs =====
-    function parseLogFile(content){
+    // ===== Parser de logs (símbolos por delante de 'A' para el corte entre equipos) =====
+    function parseLogFileSymbols(content){
       const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
       const teamStart = lines.findIndex(l=>l.includes('CLASIFICACION EQUIPOS'));
       const playerStart = lines.findIndex(l=>l.includes('CLASIFICACION INDIVIDUAL'));
       if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
+
+      // Equipos tal como vienen (ganador primero)
       const teams = {}; const teamOrder = [];
       for (let i=teamStart+1; i<playerStart; i++){
         const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
         if (!m) continue; const team=m[1].trim(); const points=parseInt(m[2],10);
         teams[team]=points; teamOrder.push(team);
       }
+
+      // Jugadores tal cual
       const players = [];
       for (let i=playerStart+1; i<lines.length; i++){
-        const line = lines[i]; const parts=line.split(/\s+/); if (parts.length<2) continue;
+        const line = lines[i]; if(!line) continue;
+        const parts=line.split(/\s+/); if (parts.length<2) continue;
         const name=parts[0]; const points=parseInt(parts[1],10);
         players.push({
           name: name.toUpperCase(),
@@ -533,10 +553,24 @@
           absent: line.includes('NO ESTUVO PRESENTE')
         });
       }
-      const teamNames = Object.keys(teams).sort();
-      let index=0, lastInitial='';
-      players.forEach(p=>{ const initial=p.name.charAt(0).toUpperCase(); if (initial<lastInitial) index++; p.team=teamNames[index]||'SinEquipo'; lastInitial=initial; });
-      return { teams, teamOrder: teamOrder.sort((a,b)=>teams[b]-teams[a]), players };
+
+      // Asignación a equipos por rotura alfabética con símbolos delante de 'A'
+      const teamNames = teamOrder.slice();
+      let switched = false;
+      if (players.length){
+        players[0].team = teamNames[0] || 'SinEquipo';
+        let prevNick = players[0].name;
+        for (let i=1;i<players.length;i++){
+          const curr = players[i];
+          if (!switched && cmpNick(curr.name, prevNick) < 0){
+            switched = true; // desde aquí, segundo equipo
+          }
+          curr.team = switched ? (teamNames[1]||'SinEquipo') : (teamNames[0]||'SinEquipo');
+          prevNick = curr.name;
+        }
+      }
+
+      return { teams, teamOrder, players };
     }
   </script>
 </body>

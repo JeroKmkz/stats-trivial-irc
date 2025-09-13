@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.6+NoGrid</title>
+  <title>Procesador de Logs de Trivial IRC — V4.7</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -196,6 +196,7 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
+          // Antes fijábamos +14; ahora el extractor de totales sigue igual porque viene de Excels ya normalizados
           currentRow += 14;
         } else { currentRow++; }
       }
@@ -314,30 +315,49 @@
 
             const teamTotals = teams.map(t=>{ const tt={scratches:0, palos:0, aces:0}; t.players.forEach(p=>{ if(!p.absent){ tt.scratches+=p.scratches; tt.palos+=p.palos; tt.aces+=p.aces; } }); return tt; });
 
+            // --- Cabecera de bloque (fila de etiquetas vacía + columnas métricas) ---
             const hdr = [''];
             teams.forEach((t,i)=>{ hdr.push(''); hdr.push('Puntos'); hdr.push('Scratches'); hdr.push('Palos'); hdr.push('Aces'); if(i<teams.length-1) hdr.push(''); });
             ws.getRow(currentRow).values = hdr;
 
+            // --- Fila de totales por equipo ---
             const tot = [''];
             teams.forEach((t,i)=>{ tot.push(t.name); tot.push(t.points); tot.push(teamTotals[i].scratches); tot.push(teamTotals[i].palos); tot.push(teamTotals[i].aces); if(i<teams.length-1) tot.push(''); });
             ws.getRow(currentRow+1).values = tot;
 
+            // Estilos cabecera + totales
             let col=2; teams.forEach((t,ti)=>{
               for(let i=0;i<5;i++){ const c=ws.getCell(currentRow, col+i); c.font={bold:false,size:13}; c.alignment={horizontal:'center',vertical:'center'}; c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
               for(let i=0;i<5;i++){ const c=ws.getCell(currentRow+1, col+i); if(i===0){ c.fill={type:'pattern',pattern:'solid',fgColor:{argb:t.colors.bg.replace('#','FF')}}; c.font={color:{argb:t.colors.fg.replace('#','FF')},bold:true,size:14}; } else if (i===1){ c.font={bold:true,size:12}; } else { c.font={bold:false,size:12}; } c.alignment={horizontal:'center',vertical:'center'}; c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
               col += (ti<teams.length-1)?6:5;
             });
 
+            // --- Filas de jugadores: AHORA contamos realmente cuántas escribimos ---
+            let rowsWritten = 0;
             for(let i=0;i<10;i++){
-              const r = currentRow+2+i; const hasAny = teams.some(t=>i<t.players.length); if(!hasAny) continue;
-              const row=['']; teams.forEach((t,ti)=>{ const p=t.players[i]; if(p){ row.push(p.name); row.push(p.absent?'':p.points); row.push(p.absent?'':p.scratches); row.push(p.absent?'':p.palos); row.push(p.absent?'':p.aces); } else { row.push('','','','',''); } if(ti<teams.length-1) row.push(''); });
+              const r = currentRow+2+rowsWritten;
+              const hasAny = teams.some(t=>i<t.players.length);
+              if(!hasAny) break; // no hay más jugadores en esta partida
+              rowsWritten++;
+              const row=[''];
+              teams.forEach((t,ti)=>{ const p=t.players[i];
+                if(p){ row.push(p.name, p.absent?'':p.points, p.absent?'':p.scratches, p.absent?'':p.palos, p.absent?'':p.aces); }
+                else { row.push('','','','',''); }
+                if(ti<teams.length-1) row.push('');
+              });
               ws.getRow(r).values = row;
-              let c=2; teams.forEach((t,ti)=>{ const p=t.players[i]; if(p){ for(let j=0;j<5;j++){ const cell=ws.getCell(r, c+j); cell.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; cell.alignment={horizontal: j===0?'left':'center', vertical:'center'}; } } c += (ti<teams.length-1)?6:5; });
+
+              let c=2; teams.forEach((t,ti)=>{ const p=t.players[i];
+                if(p){ for(let j=0;j<5;j++){ const cell=ws.getCell(r, c+j); cell.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; cell.alignment={horizontal: j===0?'left':'center', vertical:'center'}; } }
+                c += (ti<teams.length-1)?6:5;
+              });
             }
 
-            currentRow += 14;
+            // Avanzar a la siguiente partida: 2 filas (cabecera+totales) + filas escritas + 2 de separación
+            currentRow += 2 + rowsWritten + 2;
           });
 
+          // Anchos + marco
           if (processedData.length>0){
             const tcount=processedData[0].teamOrder.length;
             const widths=[3];

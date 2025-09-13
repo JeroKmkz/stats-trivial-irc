@@ -456,8 +456,15 @@
         });
       });
 
-      // Inserta UNA sola fila vacía (altura ~7.5) tras el 33º
-      if (players.length > 33){ const cutRow = 36; ws.spliceRows(cutRow, 0, []); try { ws.getRow(cutRow).height = 7.5; } catch {} }
+      // Inserta DOS filas vacías (altura ~7.5) tras el 33º
+      if (players.length > 33){
+        const cutRow = 36; // 2 cabeceras (2) + 33 filas (33) = 35 → insertamos a partir de la 36
+        ws.spliceRows(cutRow, 0, [], []); // ← dos filas de golpe
+        try {
+          ws.getRow(cutRow).height = 7.5;
+          ws.getRow(cutRow + 1).height = 7.5;
+        } catch {}
+      }
 
       // === BLOQUES DE EQUIPOS (sin huecos; SCO solo en PUNTOS/SCRATCHES) ===
       const tBlocks = [

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.7</title>
+  <title>Procesador de Logs de Trivial IRC — V4.6+Totales2</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -95,7 +95,7 @@
         reader.onload = (e)=>{
           try{
             const content = e.target.result;
-            const data = parseLogFileSymbols(content); // versión robusta con símbolos
+            const data = parseLogFileSymbols(content); // *** NO TOCAR ***
             processedData[index] = data;
             processed++;
             if (processed === files.length){
@@ -270,7 +270,7 @@
           header.textContent = `${team} - ${data.teams[team]} puntos`;
           teamDiv.appendChild(header);
           const table = document.createElement('table'); table.className='stats-table';
-          table.innerHTML = `<tr><th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Aces</th></tr>`;
+          table.innerHTML = `<tr><th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Ace</th></tr>`.replace('Ace','Aces');
           players.forEach(p=>{
             const row = document.createElement('tr'); row.className='player-row';
             row.innerHTML = `
@@ -294,6 +294,7 @@
       try{
         const wb = new ExcelJS.Workbook();
         if (currentProcess === 'jornada'){
+          // *** NO TOCAR: hoja Estádisticas tal y como estaba ***
           const ws = wb.addWorksheet('Estadísticas');
           let currentRow = 1;
           processedData.forEach(matchData => {
@@ -340,10 +341,13 @@
             addFraming(ws, widths[0]);
           }
         } else if (currentProcess === 'totales'){
+          // Hoja Totales (jugadores + equipos) — SIN cambios
           const ws = wb.addWorksheet('Totales');
           generateTotalsSheet(ws);
+
+          // NUEVA hoja Totales2 (SOLO equipos, fuente 14)
           const ws2 = wb.addWorksheet('Totales2');
-          generateTotalsTeamsSheet(ws2, 14); // ← Hoja nueva SOLO equipos, fuente 14
+          generateTotalsTeamsSheet(ws2, 14);
         }
 
         const buffer = await wb.xlsx.writeBuffer();
@@ -361,8 +365,8 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ========== Agregados comunes ==========
-    function computeAggregates(){
+    // ===== Totales/Medias con SCO (se mantiene igual) =====
+    function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
 
@@ -371,7 +375,6 @@
           if (!teamTotals[teamName]) teamTotals[teamName] = { name:teamName, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,totalAsistencia:0,gamesPlayed:0, scoPuntos:0, scoScratches:0 };
         });
 
-        // SCO por PUNTOS
         if (match.teamOrder.length >= 2){
           const A = match.teamOrder[0], B = match.teamOrder[1];
           const pA = +(match.teams[A] || 0), pB = +(match.teams[B] || 0);
@@ -379,7 +382,6 @@
           teamTotals[A].scoPuntos += sA; teamTotals[B].scoPuntos += sB;
         }
 
-        // Agregados de equipo + SCR para SCO
         const scratchesByTeam = {};
         match.teamOrder.forEach(teamName => {
           teamTotals[teamName].totalPoints += match.teams[teamName] || 0;
@@ -395,7 +397,6 @@
           scratchesByTeam[teamName] = scrSum;
         });
 
-        // SCO por SCRATCHES
         if (match.teamOrder.length >= 2){
           const A = match.teamOrder[0], B = match.teamOrder[1];
           const sA = scratchesByTeam[A] || 0, sB = scratchesByTeam[B] || 0;
@@ -403,11 +404,15 @@
           teamTotals[A].scoScratches += sa; teamTotals[B].scoScratches += sb;
         }
 
-        // Jugadores
         match.players.forEach(p=>{
           if (!p.absent){
             if (!playerTotals[p.name]) playerTotals[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
-            const rec = playerTotals[p.name]; rec.team=p.team; rec.totalPoints += p.points||0; rec.totalPalos += p.palos||0; rec.totalScratches += p.scratches||0; rec.totalAces += p.aces||0; rec.gamesPlayed += 1;
+            const rec = playerTotals[p.name]; rec.team=p.team;
+            rec.totalPoints += p.points||0;
+            rec.totalPalos += p.palos||0;
+            rec.totalScratches += p.scratches||0;
+            rec.totalAces += p.aces||0;
+            rec.gamesPlayed += 1;
           }
         });
       });
@@ -424,13 +429,6 @@
         avgScratches: t.gamesPlayed? t.totalScratches/t.gamesPlayed:0,
         avgAces: t.gamesPlayed? t.totalAces/t.gamesPlayed:0,
         avgAsistencia: t.gamesPlayed? t.totalAsistencia/t.gamesPlayed:0 }));
-
-      return { players, teams };
-    }
-
-    // ===== Totales/Medias (jugadores + equipos) =====
-    function generateTotalsSheet(ws){
-      const { players, teams } = computeAggregates();
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
@@ -465,14 +463,11 @@
         });
       });
 
-      // Inserta DOS filas vacías (altura ~7.5) tras el 33º
+      // Inserta DOS filas vacías tras el 33º (como ya tenías)
       if (players.length > 33){
         const cutRow = 36;
         ws.spliceRows(cutRow, 0, [], []);
-        try {
-          ws.getRow(cutRow).height = 7.5;
-          ws.getRow(cutRow + 1).height = 7.5;
-        } catch {}
+        try { ws.getRow(cutRow).height = 7.5; ws.getRow(cutRow+1).height = 7.5; } catch {}
       }
 
       // === BLOQUES DE EQUIPOS (SCO solo en PUNTOS/SCRATCHES) ===
@@ -515,34 +510,71 @@
         });
       });
 
-      // Anchos sin huecos visibles
       ws.columns = [
         { width: 2.25 },
-        // Jugadores (4 bloques x 4 columnas + separadores)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // Separadores entre jugadores y equipos
         { width: 3 }, { width: 3 },
-        // Equipos (PUNTOS con SCO)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // POSTES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // SCRATCHES con SCO
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // ACES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        // ASISTENCIA
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }
       ];
 
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== SOLO equipos (Totales2) con fuente grande =====
+    // ===== NUEVA: SOLO equipos (Totales2) con fuente grande =====
     function generateTotalsTeamsSheet(ws, fontSize = 14){
-      const { teams } = computeAggregates();
+      // Reutilizamos los agregados calculando rápido aquí
+      const teamTotals = {};
+      function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
+
+      processedData.forEach(match => {
+        match.teamOrder.forEach(teamName => {
+          if (!teamTotals[teamName]) teamTotals[teamName] = { name:teamName, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,totalAsistencia:0,gamesPlayed:0, scoPuntos:0, scoScratches:0 };
+        });
+
+        if (match.teamOrder.length >= 2){
+          const A = match.teamOrder[0], B = match.teamOrder[1];
+          const pA = +(match.teams[A] || 0), pB = +(match.teams[B] || 0);
+          const [sA, sB] = awardSco(pA, pB);
+          teamTotals[A].scoPuntos += sA; teamTotals[B].scoPuntos += sB;
+        }
+
+        const scratchesByTeam = {};
+        match.teamOrder.forEach(teamName => {
+          teamTotals[teamName].totalPoints += match.teams[teamName] || 0;
+          const teamPlayers = match.players.filter(p=>p.team===teamName && !p.absent);
+          teamTotals[teamName].totalAsistencia += teamPlayers.length;
+          teamTotals[teamName].gamesPlayed += 1;
+          let scrSum = 0;
+          teamPlayers.forEach(p=>{
+            teamTotals[teamName].totalPalos += p.palos||0;
+            teamTotals[teamName].totalScratches += p.scratches||0; scrSum += p.scratches||0;
+            teamTotals[teamName].totalAces += p.aces||0;
+          });
+          scratchesByTeam[teamName] = scrSum;
+        });
+
+        if (match.teamOrder.length >= 2){
+          const A = match.teamOrder[0], B = match.teamOrder[1];
+          const sA = scratchesByTeam[A] || 0, sB = scratchesByTeam[B] || 0;
+          const [sa, sb] = awardSco(sA, sB);
+          teamTotals[A].scoScratches += sa; teamTotals[B].scoScratches += sb;
+        }
+      });
+
+      const teams = Object.values(teamTotals).map(t=>({ ...t,
+        avgPoints: t.gamesPlayed? t.totalPoints/t.gamesPlayed:0,
+        avgPalos: t.gamesPlayed? t.totalPalos/t.gamesPlayed:0,
+        avgScratches: t.gamesPlayed? t.totalScratches/t.gamesPlayed:0,
+        avgAces: t.gamesPlayed? t.totalAces/t.gamesPlayed:0,
+        avgAsistencia: t.gamesPlayed? t.totalAsistencia/t.gamesPlayed:0 }));
+
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
       const tBlocks = [
@@ -553,7 +585,7 @@
         { title:'ASISTENCIA', baseCol:24, hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
       ];
 
-      // Títulos de bloque
+      // Títulos
       tBlocks.forEach(b => {
         const ttl = ws.getCell(1, b.baseCol+2);
         ttl.value = b.title;
@@ -609,7 +641,7 @@
         });
       });
 
-      // Anchos (compacto para Totales2)
+      // Anchos y marco
       ws.columns = [
         { width: 2.25 },
         // PUNTOS (con SCO)
@@ -623,7 +655,6 @@
         // ASISTENCIA
         { width: 18 }, { width: 9 }, { width: 9 }, { width: 9 }
       ];
-
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
@@ -635,25 +666,29 @@
       if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
 
       // Equipos tal como vienen (ganador primero)
-      const teams = {}; const teamOrder = [];
+      const teams = {}, teamOrder = [];
       for (let i=teamStart+1; i<playerStart; i++){
-        const m = /^(.*?)\s+(-?\\d+)\\s*$/.exec(lines[i]);
-        if (!m) continue; const team=m[1].trim(); const points=parseInt(m[2],10);
-        teams[team]=points; teamOrder.push(team);
+        const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
+        if (!m) continue;
+        const team = m[1].trim();
+        const points = parseInt(m[2], 10);
+        teams[team] = points;
+        teamOrder.push(team);
       }
 
       // Jugadores tal cual
       const players = [];
       for (let i=playerStart+1; i<lines.length; i++){
         const line = lines[i]; if(!line) continue;
-        const parts=line.split(/\\s+/); if (parts.length<2) continue;
-        const name=parts[0]; const points=parseInt(parts[1],10);
+        const parts = line.split(/\s+/); if (parts.length < 2) continue;
+        const name = parts[0];
+        const points = parseInt(parts[1], 10);
         players.push({
           name: name.toUpperCase(),
           points: line.includes('NO ESTUVO PRESENTE') ? null : points,
-          aces: parseInt((line.match(/Aces:\\s*(\\d+)/) || [0,0])[1],10),
-          scratches: parseInt((line.match(/Scr:\\s*(\\d+)/) || [0,0])[1],10),
-          palos: parseInt((line.match(/Palos:\\s*(\\d+)/) || [0,0])[1],10),
+          aces: parseInt((line.match(/Aces:\s*(\d+)/) || [0,0])[1],10),
+          scratches: parseInt((line.match(/Scr:\s*(\d+)/) || [0,0])[1],10),
+          palos: parseInt((line.match(/Palos:\s*(\d+)/) || [0,0])[1],10),
           absent: line.includes('NO ESTUVO PRESENTE')
         });
       }

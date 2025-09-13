@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.6+Totales2</title>
+  <title>Procesador de Logs de Trivial IRC — V4.6+NoGrid</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -85,6 +85,45 @@
     function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
     function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 
+    // ===== Helpers ExcelJS =====
+    function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
+    function norm(v){ return xlsToString(v).trim().toUpperCase(); }
+    function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
+
+    // Ocultar cuadrícula en cada hoja que creemos
+    function createWorksheetNoGrid(workbook, name){
+      const ws = workbook.addWorksheet(name);
+      ws.views = [{ state: 'normal', showGridLines: false }]; // mantenemos encabezados
+      return ws;
+    }
+
+    // ====== Comparador de nicks: símbolos (^[, etc.) antes que 'A' ======
+    function normalizeNick(nick){
+      return String(nick||'').trim().toUpperCase().normalize('NFD').replace(/\p{Diacritic}+/gu,'');
+    }
+    function nickKey(nick){
+      const s = normalizeNick(nick);
+      const first = s.charAt(0);
+      const isLetter = /^[A-ZÑ]$/.test(first);
+      return (isLetter ? '1' : '0') + s;
+    }
+    function cmpNick(a,b){
+      const A = nickKey(a), B = nickKey(b);
+      return A.localeCompare(B,'es',{sensitivity:'base',numeric:true});
+    }
+
+    // Marco: fila vacía arriba/abajo y columna vacía al final
+    function addFraming(ws, padWidth){
+      if (Array.isArray(ws.columns) && ws.columns.length){
+        const width = padWidth ?? ws.columns[0]?.width ?? 3;
+        ws.columns = [...ws.columns, { width }];
+      }
+      ws.spliceRows(1, 0, []);
+      try { ws.getRow(1).height = 7.5; } catch {}
+      ws.addRow([]);
+      try { ws.getRow(ws.lastRow.number).height = 7.5; } catch {}
+    }
+
     // ====== PROCESO 1: Jornada (desde logs .txt) ======
     function processJornada(){
       const files = document.getElementById('fileInputJornada').files;
@@ -95,7 +134,7 @@
         reader.onload = (e)=>{
           try{
             const content = e.target.result;
-            const data = parseLogFileSymbols(content); // *** NO TOCAR ***
+            const data = parseLogFileSymbols(content);
             processedData[index] = data;
             processed++;
             if (processed === files.length){
@@ -135,42 +174,6 @@
         document.getElementById('downloadSection').style.display='block';
         showSuccess(`${fileNames.length} archivo${fileNames.length>1?'s':''} de jornada procesado${fileNames.length>1?'s':''} correctamente`);
       }catch(err){ showError('Error procesando archivos Excel: '+err.message); }
-    }
-
-    // ========= Helpers ExcelJS =========
-    function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
-    function norm(v){ return xlsToString(v).trim().toUpperCase(); }
-    function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
-
-    // ====== Comparador de nicks: símbolos (^[, etc.) van antes que 'A' ======
-    function normalizeNick(nick){
-      return String(nick||'')
-        .trim()
-        .toUpperCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}+/gu,'');
-    }
-    function nickKey(nick){
-      const s = normalizeNick(nick);
-      const first = s.charAt(0);
-      const isLetter = /^[A-ZÑ]$/.test(first);
-      return (isLetter ? '1' : '0') + s;
-    }
-    function cmpNick(a,b){
-      const A = nickKey(a), B = nickKey(b);
-      return A.localeCompare(B,'es',{sensitivity:'base',numeric:true});
-    }
-
-    // Marco: fila vacía arriba/abajo y columna vacía al final
-    function addFraming(ws, padWidth){
-      if (Array.isArray(ws.columns) && ws.columns.length){
-        const width = padWidth ?? ws.columns[0]?.width ?? 3;
-        ws.columns = [...ws.columns, { width }];
-      }
-      ws.spliceRows(1, 0, []);
-      try { ws.getRow(1).height = 7.5; } catch {}
-      ws.addRow([]);
-      try { ws.getRow(ws.lastRow.number).height = 7.5; } catch {}
     }
 
     function findHeaderStartCol(row){
@@ -270,7 +273,7 @@
           header.textContent = `${team} - ${data.teams[team]} puntos`;
           teamDiv.appendChild(header);
           const table = document.createElement('table'); table.className='stats-table';
-          table.innerHTML = `<tr><th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Ace</th></tr>`.replace('Ace','Aces');
+          table.innerHTML = `<tr><th></th><th>Puntos</th><th>Scratches</th><th>Palos</th><th>Aces</th></tr>`;
           players.forEach(p=>{
             const row = document.createElement('tr'); row.className='player-row';
             row.innerHTML = `
@@ -293,10 +296,12 @@
       if (!processedData || processedData.length === 0) return showError('No hay datos procesados');
       try{
         const wb = new ExcelJS.Workbook();
+
         if (currentProcess === 'jornada'){
-          // *** NO TOCAR: hoja Estádisticas tal y como estaba ***
-          const ws = wb.addWorksheet('Estadísticas');
+          // Hoja Estadísticas SIN cuadrícula
+          const ws = createWorksheetNoGrid(wb, 'Estadísticas');
           let currentRow = 1;
+
           processedData.forEach(matchData => {
             const teams = matchData.teamOrder.map(teamName => ({
               name: teamName,
@@ -340,13 +345,14 @@
             ws.columns = widths.map(w=>({width:w}));
             addFraming(ws, widths[0]);
           }
+
         } else if (currentProcess === 'totales'){
-          // Hoja Totales (jugadores + equipos) — SIN cambios
-          const ws = wb.addWorksheet('Totales');
+          // Hoja Totales (jugadores + equipos) SIN cuadrícula
+          const ws = createWorksheetNoGrid(wb, 'Totales');
           generateTotalsSheet(ws);
 
-          // NUEVA hoja Totales2 (SOLO equipos, fuente 14)
-          const ws2 = wb.addWorksheet('Totales2');
+          // Hoja Totales2 (solo equipos, fuente 14) SIN cuadrícula
+          const ws2 = createWorksheetNoGrid(wb, 'Totales2');
           generateTotalsTeamsSheet(ws2, 14);
         }
 
@@ -365,7 +371,7 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ===== Totales/Medias con SCO (se mantiene igual) =====
+    // ===== Totales/Medias con SCO, top-33 doble separador, marco, etc. =====
     function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
@@ -463,11 +469,11 @@
         });
       });
 
-      // Inserta DOS filas vacías tras el 33º (como ya tenías)
+      // Inserta DOS filas vacías (altura ~7.5) tras el 33º
       if (players.length > 33){
-        const cutRow = 36;
+        const cutRow = 36; // 2 cabeceras + 33 filas = 35 → insertar en 36
         ws.spliceRows(cutRow, 0, [], []);
-        try { ws.getRow(cutRow).height = 7.5; ws.getRow(cutRow+1).height = 7.5; } catch {}
+        try { ws.getRow(cutRow).height = 7.5; ws.getRow(cutRow + 1).height = 7.5; } catch {}
       }
 
       // === BLOQUES DE EQUIPOS (SCO solo en PUNTOS/SCRATCHES) ===
@@ -527,9 +533,8 @@
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }
 
-    // ===== NUEVA: SOLO equipos (Totales2) con fuente grande =====
+    // ===== SOLO Equipos (Totales2) fuente grande =====
     function generateTotalsTeamsSheet(ws, fontSize = 14){
-      // Reutilizamos los agregados calculando rápido aquí
       const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
 
@@ -641,7 +646,6 @@
         });
       });
 
-      // Anchos y marco
       ws.columns = [
         { width: 2.25 },
         // PUNTOS (con SCO)
@@ -676,7 +680,7 @@
         teamOrder.push(team);
       }
 
-      // Jugadores tal cual
+      // Jugadores
       const players = [];
       for (let i=playerStart+1; i<lines.length; i++){
         const line = lines[i]; if(!line) continue;

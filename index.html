@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.7</title>
+  <title>Procesador de Logs de Trivial IRC — V4.8</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -90,10 +90,10 @@
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
 
-    // Ocultar cuadrícula en cada hoja que creemos
+    // Ocultar cuadrícula en cada hoja que creemos (dejando encabezados)
     function createWorksheetNoGrid(workbook, name){
       const ws = workbook.addWorksheet(name);
-      ws.views = [{ state: 'normal', showGridLines: false }]; // mantenemos encabezados
+      ws.views = [{ state: 'normal', showGridLines: false }];
       return ws;
     }
 
@@ -176,6 +176,7 @@
       }catch(err){ showError('Error procesando archivos Excel: '+err.message); }
     }
 
+    // === Lector de bloques desde la hoja "Estadísticas" generada ===
     function findHeaderStartCol(row){
       const n = row.actualCellCount || row.cellCount || 100;
       for (let c=1; c<=n; c++){
@@ -196,9 +197,11 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
-          // Antes fijábamos +14; ahora el extractor de totales sigue igual porque viene de Excels ya normalizados
-          currentRow += 14;
-        } else { currentRow++; }
+          // *** Cambio clave: avanzar solo UNA fila y seguir escaneando (bloques de altura variable) ***
+          currentRow = currentRow + 1;
+        } else {
+          currentRow++;
+        }
       }
       return matches;
     }
@@ -225,7 +228,7 @@
             const absent = (pPoints === null);
             players.push({ name: name.toUpperCase(), team: teamName, points: absent ? null : pPoints, scratches: absent ? 0 : pScr, palos: absent ? 0 : pPalos, aces: absent ? 0 : pAces, absent });
           }
-          col += 6;
+          col += 6; // 5 columnas de datos + 1 separador
         }
         return { teams, teamOrder, players };
       }catch(e){ console.error('extractSingleMatch error', e); return null; }
@@ -299,7 +302,7 @@
         const wb = new ExcelJS.Workbook();
 
         if (currentProcess === 'jornada'){
-          // Hoja Estadísticas SIN cuadrícula
+          // Hoja Estadísticas (sin cuadrícula)
           const ws = createWorksheetNoGrid(wb, 'Estadísticas');
           let currentRow = 1;
 
@@ -315,29 +318,29 @@
 
             const teamTotals = teams.map(t=>{ const tt={scratches:0, palos:0, aces:0}; t.players.forEach(p=>{ if(!p.absent){ tt.scratches+=p.scratches; tt.palos+=p.palos; tt.aces+=p.aces; } }); return tt; });
 
-            // --- Cabecera de bloque (fila de etiquetas vacía + columnas métricas) ---
+            // Cabecera
             const hdr = [''];
             teams.forEach((t,i)=>{ hdr.push(''); hdr.push('Puntos'); hdr.push('Scratches'); hdr.push('Palos'); hdr.push('Aces'); if(i<teams.length-1) hdr.push(''); });
             ws.getRow(currentRow).values = hdr;
 
-            // --- Fila de totales por equipo ---
+            // Totales por equipo
             const tot = [''];
             teams.forEach((t,i)=>{ tot.push(t.name); tot.push(t.points); tot.push(teamTotals[i].scratches); tot.push(teamTotals[i].palos); tot.push(teamTotals[i].aces); if(i<teams.length-1) tot.push(''); });
             ws.getRow(currentRow+1).values = tot;
 
-            // Estilos cabecera + totales
+            // Estilos
             let col=2; teams.forEach((t,ti)=>{
               for(let i=0;i<5;i++){ const c=ws.getCell(currentRow, col+i); c.font={bold:false,size:13}; c.alignment={horizontal:'center',vertical:'center'}; c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
               for(let i=0;i<5;i++){ const c=ws.getCell(currentRow+1, col+i); if(i===0){ c.fill={type:'pattern',pattern:'solid',fgColor:{argb:t.colors.bg.replace('#','FF')}}; c.font={color:{argb:t.colors.fg.replace('#','FF')},bold:true,size:14}; } else if (i===1){ c.font={bold:true,size:12}; } else { c.font={bold:false,size:12}; } c.alignment={horizontal:'center',vertical:'center'}; c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
               col += (ti<teams.length-1)?6:5;
             });
 
-            // --- Filas de jugadores: AHORA contamos realmente cuántas escribimos ---
+            // Filas de jugadores (alto real)
             let rowsWritten = 0;
             for(let i=0;i<10;i++){
               const r = currentRow+2+rowsWritten;
               const hasAny = teams.some(t=>i<t.players.length);
-              if(!hasAny) break; // no hay más jugadores en esta partida
+              if(!hasAny) break;
               rowsWritten++;
               const row=[''];
               teams.forEach((t,ti)=>{ const p=t.players[i];
@@ -353,7 +356,7 @@
               });
             }
 
-            // Avanzar a la siguiente partida: 2 filas (cabecera+totales) + filas escritas + 2 de separación
+            // Siguiente bloque: 2 filas (cab+tot) + filas reales + 2 de separación
             currentRow += 2 + rowsWritten + 2;
           });
 
@@ -391,7 +394,7 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ===== Totales/Medias con SCO, top-33 doble separador, marco, etc. =====
+    // ===== Totales/Medias con SCO, top-33, marco, etc. =====
     function generateTotalsSheet(ws){
       const playerTotals = {}; const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
@@ -489,7 +492,7 @@
         });
       });
 
-      // Inserta DOS filas vacías (altura ~7.5) tras el 33º
+      // Inserta DOS filas vacías tras el 33º
       if (players.length > 33){
         const cutRow = 36; // 2 cabeceras + 33 filas = 35 → insertar en 36
         ws.spliceRows(cutRow, 0, [], []);
@@ -500,7 +503,7 @@
       const tBlocks = [
         { title:'PUNTOS',     baseCol:24, hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
         { title:'POSTES',     baseCol:30, hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
-        { title:'SCRATCHES',  baseCol:35, hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:35, hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:+t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
         { title:'ACES',       baseCol:41, hasSco:false, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
         { title:'ASISTENCIA', baseCol:46, hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
       ];
@@ -717,7 +720,7 @@
         });
       }
 
-      // Asignación a equipos usando ORDEN ALFABÉTICO DE EQUIPO (símbolos antes de 'A')
+      // Asignación a equipos por orden alfabético (símbolos antes de 'A')
       const teamsAlpha = Object.keys(teams).sort((a,b)=>cmpNick(a,b));
 
       let switched = false;
@@ -728,7 +731,7 @@
         for (let i=1; i<players.length; i++){
           const curr = players[i];
           if (!switched && cmpNick(curr.name, prevNick) < 0) {
-            switched = true; // a partir de aquí, segundo equipo alfabético
+            switched = true;
           }
           curr.team = switched ? (teamsAlpha[1] || 'SinEquipo') : (teamsAlpha[0] || 'SinEquipo');
           prevNick = curr.name;

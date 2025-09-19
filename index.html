@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V4.9 (imagen clasificaciones)</title>
+  <title>Procesador de Logs de Trivial IRC — V5.1</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
-  <!-- Para exportar a imagen -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
     .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -27,54 +25,6 @@
     .error { color: #dc3545; background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; }
     .success { color: #155724; background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; }
     .log-info { background-color: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0; }
-
-    /* ===== Estilos para el render a imagen de clasificaciones (equipos) ===== */
-    #imageActions { display:none; text-align:center; margin-top: 10px; }
-    #renderWrapper { display:none; }
-    #imgRenderArea {
-      background: #ffffff;
-      padding: 24px;
-      border: 1px solid #e5e5e5;
-      border-radius: 10px;
-      width: fit-content;
-      max-width: 1600px;
-      margin: 0 auto;
-    }
-    .boards-title {
-      font-weight: bold;
-      font-size: 20px;
-      text-align: center;
-      margin: 4px 0 16px 0;
-    }
-    .boards-grid {
-      display: grid;
-      grid-template-columns: repeat(5, max-content);
-      gap: 18px 28px;
-      align-items: start;
-    }
-    .board {
-      border-collapse: collapse;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-      min-width: 380px;
-      table-layout: fixed;
-      font-size: 14px; /* equivalente a Totales2 */
-    }
-    .board th, .board td {
-      border: 1px solid #d6d6d6;
-      padding: 6px 10px;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .board th { background:#f7f7f7; font-weight: bold; }
-    .board .col-name { text-align: left; width: 180px; }
-    .board .title {
-      text-align: center;
-      background: #f0f0f0;
-      font-weight: bold;
-      font-size: 16px;
-    }
   </style>
 </head>
 <body>
@@ -103,17 +53,6 @@
 
     <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
       <button class="button" onclick="downloadExcel()" id="downloadBtn">📥 Descargar Excel</button>
-    </div>
-
-    <!-- Acciones extra para imagen (aparece tras procesar Totales) -->
-    <div id="imageActions">
-      <button class="button" onclick="renderTeamsBoardsPreview()">👀 Previsualizar clasificaciones (equipos)</button>
-      <button class="button" onclick="downloadTeamsBoardsPNG()">🖼️ Descargar imagen (clasificaciones equipos)</button>
-    </div>
-
-    <!-- Área oculta donde se renderiza la imagen -->
-    <div id="renderWrapper">
-      <div id="imgRenderArea"></div>
     </div>
   </div>
 
@@ -151,7 +90,7 @@
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
 
-    // Ocultar cuadrícula en cada hoja que creemos (dejando encabezados)
+    // Ocultar cuadrícula (dejando encabezados)
     function createWorksheetNoGrid(workbook, name){
       const ws = workbook.addWorksheet(name);
       ws.views = [{ state: 'normal', showGridLines: false }];
@@ -233,8 +172,6 @@
         }
         displayTotalesOnlyResults();
         document.getElementById('downloadSection').style.display='block';
-        // Habilitar acciones de imagen
-        document.getElementById('imageActions').style.display = 'block';
         showSuccess(`${fileNames.length} archivo${fileNames.length>1?'s':''} de jornada procesado${fileNames.length>1?'s':''} correctamente`);
       }catch(err){ showError('Error procesando archivos Excel: '+err.message); }
     }
@@ -260,8 +197,7 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
-          // avanzar solo 1 fila (bloques de altura variable)
-          currentRow = currentRow + 1;
+          currentRow = currentRow + 1; // avanzar poco a poco (bloque de altura variable)
         } else {
           currentRow++;
         }
@@ -306,7 +242,7 @@
         <p><strong>Jornadas procesadas:</strong> ${fileNames.length}</p>
         <p><strong>Partidas totales:</strong> ${totalMatches}</p>
         <p><strong>Jugadores únicos:</strong> ${allPlayers.size}</p>
-        <p><em>Pulsa "Descargar Excel" o usa las opciones de imagen</em></p>`;
+        <p><em>Pulsa "Descargar Excel" para generar el acumulado</em></p>`;
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
@@ -398,7 +334,7 @@
               col += (ti<teams.length-1)?6:5;
             });
 
-            // Filas de jugadores (alto real)
+            // Filas de jugadores (alto real del bloque)
             let rowsWritten = 0;
             for(let i=0;i<10;i++){
               const r = currentRow+2+rowsWritten;
@@ -419,7 +355,7 @@
               });
             }
 
-            // Siguiente bloque: 2 filas (cab+tot) + filas reales + 2 de separación
+            // Siguiente bloque: 2 (cab+tot) + filas reales + 2 de separación
             currentRow += 2 + rowsWritten + 2;
           });
 
@@ -457,7 +393,7 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // ===== Agregados comunes para equipos (reutilizados por Excel e imagen) =====
+    // ===== Agregados para equipos / jugadores (reutilizados por Excel) =====
     function aggregateTeamsFromProcessed(processed){
       const teamTotals = {};
       function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
@@ -504,39 +440,41 @@
         avgAces: t.gamesPlayed? t.totalAces/t.gamesPlayed:0,
         avgAsistencia: t.gamesPlayed? t.totalAsistencia/t.gamesPlayed:0
       }));
-
       return teams;
     }
 
-    // ===== Totales/Medias (Excel) con SCO, top-33, marco, etc. =====
-    function generateTotalsSheet(ws){
-      const playerTotals = {}; const teamsArr = aggregateTeamsFromProcessed(processedData);
-
-      // Jugadores
-      processedData.forEach(match=>{
+    function aggregatePlayersFromProcessed(processed){
+      const playerTotals = {};
+      processed.forEach(match=>{
         match.players.forEach(p=>{
-          if(!p.absent){
-            if(!playerTotals[p.name]) playerTotals[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
+          if (!p.absent){
+            if (!playerTotals[p.name]) playerTotals[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
             const r = playerTotals[p.name];
             r.team=p.team; r.totalPoints += p.points||0; r.totalPalos += p.palos||0; r.totalScratches += p.scratches||0; r.totalAces += p.aces||0; r.gamesPlayed += 1;
           }
         });
       });
-
-      const players = Object.values(playerTotals).map(p=>({ ...p,
+      return Object.values(playerTotals).map(p=>({ ...p,
         avgPoints: p.gamesPlayed? p.totalPoints/p.gamesPlayed:0,
         avgPalos: p.gamesPlayed? p.totalPalos/p.gamesPlayed:0,
         avgScratches: p.gamesPlayed? p.totalScratches/p.gamesPlayed:0,
-        avgAces: p.gamesPlayed? p.totalAces/p.gamesPlayed:0 }));
+        avgAces: p.gamesPlayed? p.totalAces/p.gamesPlayed:0
+      }));
+    }
+
+    // ===== Totales/Medias con orden por SCO/TOT + top-33 + marco =====
+    function generateTotalsSheet(ws){
+      const players = aggregatePlayersFromProcessed(processedData);
+      const teamsArr = aggregateTeamsFromProcessed(processedData);
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
-      // === BLOQUES DE JUGADORES ===
+      // === BLOQUES DE JUGADORES (orden por TOT, no AVG) ===
       const pBlocks = [
-        { title:'PUNTOS',     baseCol:2,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
-        { title:'POSTES',     baseCol:7,  sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
-        { title:'SCRATCHES',  baseCol:12, sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(p)=>[p.totalScratches,p.gamesPlayed,+p.avgScratches.toFixed(1)] },
-        { title:'ACES',       baseCol:17, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(p)=>[p.totalAces,p.gamesPlayed,+p.avgAces.toFixed(1)] }
+        { title:'PUNTOS',     baseCol:2,  sort:(a,b)=> (b.totalPoints - a.totalPoints),          pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
+        { title:'POSTES',     baseCol:7,  sort:(a,b)=> (b.totalPalos - a.totalPalos),            pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
+        { title:'SCRATCHES',  baseCol:12, sort:(a,b)=> (b.totalScratches - a.totalScratches),    pick:(p)=>[p.totalScratches,p.gamesPlayed,+p.avgScratches.toFixed(1)] },
+        { title:'ACES',       baseCol:17, sort:(a,b)=> (b.totalAces - a.totalAces),              pick:(p)=>[p.totalAces,p.gamesPlayed,+p.avgAces.toFixed(1)] }
       ];
 
       pBlocks.forEach(b => {
@@ -569,13 +507,23 @@
         try { ws.getRow(cutRow).height = 7.5; ws.getRow(cutRow + 1).height = 7.5; } catch {}
       }
 
-      // === BLOQUES DE EQUIPOS (SCO solo en PUNTOS/SCRATCHES) ===
+      // === BLOQUES DE EQUIPOS (orden por SCO cuando exista, si no por TOT) ===
       const tBlocks = [
-        { title:'PUNTOS',     baseCol:24, hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
-        { title:'POSTES',     baseCol:30, hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
-        { title:'SCRATCHES',  baseCol:35, hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
-        { title:'ACES',       baseCol:41, hasSco:false, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
-        { title:'ASISTENCIA', baseCol:46, hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
+        { title:'PUNTOS',     baseCol:24, hasSco:true,  // ordenar por SCO
+          sort:(a,b)=> (b.scoPuntos - a.scoPuntos),
+          pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
+        { title:'POSTES',     baseCol:30, hasSco:false, // ordenar por TOT
+          sort:(a,b)=> (b.totalPalos - a.totalPalos),
+          pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed,    avg:+t.avgPalos.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:35, hasSco:true,  // ordenar por SCO
+          sort:(a,b)=> (b.scoScratches - a.scoScratches),
+          pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'ACES',       baseCol:41, hasSco:false, // ordenar por TOT
+          sort:(a,b)=> (b.totalAces - a.totalAces),
+          pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed,    avg:+t.avgAces.toFixed(1) }) },
+        { title:'ASISTENCIA', baseCol:46, hasSco:false, // ordenar por TOT
+          sort:(a,b)=> (b.totalAsistencia - a.totalAsistencia),
+          pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed,    avg:+t.avgAsistencia.toFixed(1) }) }
       ];
 
       tBlocks.forEach(b => {
@@ -611,15 +559,22 @@
 
       ws.columns = [
         { width: 2.25 },
+        // Jugadores (4 bloques x 4 columnas + separadores)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        // Separadores entre jugadores y equipos
         { width: 3 }, { width: 3 },
+        // Equipos (PUNTOS con SCO)
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        // POSTES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        // SCRATCHES con SCO
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        // ACES
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
+        // ASISTENCIA
         { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }
       ];
 
@@ -632,42 +587,28 @@
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
       const tBlocks = [
-        { title:'PUNTOS',     baseCol:2,  hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
-        { title:'POSTES',     baseCol:8,  hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
-        { title:'SCRATCHES',  baseCol:13, hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
-        { title:'ACES',       baseCol:19, hasSco:false, sort:(a,b)=>b.avgAces-a.avgAces,           pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
-        { title:'ASISTENCIA', baseCol:24, hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
+        { title:'PUNTOS',     baseCol:2,  hasSco:true,  sort:(a,b)=> (b.scoPuntos - a.scoPuntos), pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
+        { title:'POSTES',     baseCol:8,  hasSco:false, sort:(a,b)=> (b.totalPalos - a.totalPalos), pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:13, hasSco:true,  sort:(a,b)=> (b.scoScratches - a.scoScratches), pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'ACES',       baseCol:19, hasSco:false, sort:(a,b)=> (b.totalAces - a.totalAces), pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
+        { title:'ASISTENCIA', baseCol:24, hasSco:false, sort:(a,b)=> (b.totalAsistencia - a.totalAsistencia), pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
       ];
 
-      // Títulos
+      // Títulos/cabeceras
       tBlocks.forEach(b => {
         const ttl = ws.getCell(1, b.baseCol+2);
-        ttl.value = b.title;
-        ttl.font = { bold:true, size: fontSize };
-      });
-
-      // Cabeceras
-      tBlocks.forEach(b => {
+        ttl.value = b.title; ttl.font = { bold:true, size: fontSize };
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
         ws.getCell(2, b.baseCol).font = { bold:true, size: fontSize };
         if (b.hasSco){
-          ws.getCell(2, b.baseCol+1).value = 'SCO';
-          ws.getCell(2, b.baseCol+2).value = 'TOT';
-          ws.getCell(2, b.baseCol+3).value = 'JUG';
-          ws.getCell(2, b.baseCol+4).value = 'AVG';
-          [1,2,3,4].forEach(off=>{
-            const c = ws.getCell(2, b.baseCol+off);
-            c.alignment = { horizontal:'right' };
-            c.font = { bold:true, size: fontSize };
+          ['SCO','TOT','JUG','AVG'].forEach((t,i)=>{
+            const c = ws.getCell(2, b.baseCol+1+i);
+            c.value = t; c.alignment = { horizontal:'right' }; c.font = { bold:true, size: fontSize };
           });
         } else {
-          ws.getCell(2, b.baseCol+1).value = 'TOT';
-          ws.getCell(2, b.baseCol+2).value = 'JUG';
-          ws.getCell(2, b.baseCol+3).value = 'AVG';
-          [1,2,3].forEach(off=>{
-            const c = ws.getCell(2, b.baseCol+off);
-            c.alignment = { horizontal:'right' };
-            c.font = { bold:true, size: fontSize };
+          ['TOT','JUG','AVG'].forEach((t,i)=>{
+            const c = ws.getCell(2, b.baseCol+1+i);
+            c.value = t; c.alignment = { horizontal:'right' }; c.font = { bold:true, size: fontSize };
           });
         }
       });
@@ -684,14 +625,10 @@
 
           const vals = b.pick(t);
           let colOff = 1;
-          if (b.hasSco){
-            const c = ws.getCell(row, b.baseCol+colOff);
-            c.value = vals.sco; c.alignment = { horizontal:'right' }; c.font = { size: fontSize };
-            colOff++;
-          }
-          const cTot = ws.getCell(row, b.baseCol+colOff); cTot.value = vals.tot; cTot.alignment = { horizontal:'right' }; cTot.font = { size: fontSize }; colOff++;
-          const cJug = ws.getCell(row, b.baseCol+colOff); cJug.value = vals.jug; cJug.alignment = { horizontal:'right' }; cJug.font = { size: fontSize }; colOff++;
-          const cAvg = ws.getCell(row, b.baseCol+colOff); cAvg.value = vals.avg; cAvg.alignment = { horizontal:'right' }; cAvg.font = { size: fontSize };
+          if (b.hasSco){ const c=ws.getCell(row, b.baseCol+colOff); c.value=vals.sco; c.alignment={horizontal:'right'}; c.font={size:fontSize}; colOff++; }
+          const cTot = ws.getCell(row, b.baseCol+colOff); cTot.value = vals.tot; cTot.alignment={horizontal:'right'}; cTot.font={size:fontSize}; colOff++;
+          const cJug = ws.getCell(row, b.baseCol+colOff); cJug.value = vals.jug; cJug.alignment={horizontal:'right'}; cJug.font={size:fontSize}; colOff++;
+          const cAvg = ws.getCell(row, b.baseCol+colOff); cAvg.value = vals.avg; cAvg.alignment={horizontal:'right'}; cAvg.font={size:fontSize};
         });
       });
 
@@ -709,112 +646,6 @@
         { width: 18 }, { width: 9 }, { width: 9 }, { width: 9 }
       ];
       addFraming(ws, ws.columns[0]?.width || 2.25);
-    }
-
-    // ======== RENDER A IMAGEN (equipos, estilo Totales2) ========
-    function renderTeamsBoardsPreview(){
-      if (currentProcess !== 'totales' || !processedData.length){
-        return showError('Primero procesa los Excel de “Totales y Medias Liga”.');
-      }
-      const teams = aggregateTeamsFromProcessed(processedData);
-
-      // Definición de bloques como Totales2
-      const tBlocks = [
-        { key:'PUNTOS',     hasSco:true,  sort:(a,b)=>b.avgPoints-a.avgPoints,       pick:t=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
-        { key:'POSTES',     hasSco:false, sort:(a,b)=>b.avgPalos-a.avgPalos,         pick:t=>({                          tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
-        { key:'SCRATCHES',  hasSco:true,  sort:(a,b)=>b.avgScratches-a.avgScratches, pick:t=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
-        { key:'ACES',       hasSco:false, sort:(a,b)=>b.avgAces-a.avgAces,           pick:t=>({                          tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
-        { key:'ASISTENCIA', hasSco:false, sort:(a,b)=>b.avgAsistencia-a.avgAsistencia, pick:t=>({                       tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
-      ];
-
-      const area = document.getElementById('imgRenderArea');
-      area.innerHTML = ''; // limpiar
-
-      const title = document.createElement('div');
-      title.className = 'boards-title';
-      title.textContent = 'Clasificaciones por Equipo (Totales/Medias)';
-      area.appendChild(title);
-
-      const grid = document.createElement('div');
-      grid.className = 'boards-grid';
-      area.appendChild(grid);
-
-      tBlocks.forEach(b=>{
-        const data = [...teams].sort(b.sort);
-        const table = document.createElement('table');
-        table.className = 'board';
-
-        // Título del bloque
-        const trTitle = document.createElement('tr');
-        const tdTitle = document.createElement('th');
-        tdTitle.colSpan = b.hasSco ? 5 : 4;
-        tdTitle.className = 'title';
-        tdTitle.textContent = b.key;
-        trTitle.appendChild(tdTitle);
-        table.appendChild(trTitle);
-
-        // Cabeceras
-        const trHead = document.createElement('tr');
-        const thEq = document.createElement('th'); thEq.textContent = 'EQUIPO'; thEq.className='col-name';
-        trHead.appendChild(thEq);
-        if (b.hasSco){ const thS = document.createElement('th'); thS.textContent='SCO'; trHead.appendChild(thS); }
-        ['TOT','JUG','AVG'].forEach(k=>{ const th=document.createElement('th'); th.textContent=k; trHead.appendChild(th); });
-        table.appendChild(trHead);
-
-        // Filas
-        data.forEach(t=>{
-          const tr = document.createElement('tr');
-          const colors = COLORES_EQUIPOS[t.name] || { bg:'#000000', fg:'#FFFFFF' };
-
-          const tdName = document.createElement('td');
-          tdName.textContent = t.name;
-          tdName.className = 'col-name';
-          tdName.style.backgroundColor = colors.bg;
-          tdName.style.color = colors.fg;
-          tr.appendChild(tdName);
-
-          const vals = b.pick(t);
-          if (b.hasSco){ const tdS = document.createElement('td'); tdS.textContent = vals.sco; tr.appendChild(tdS); }
-          const tdT = document.createElement('td'); tdT.textContent = vals.tot; tr.appendChild(tdT);
-          const tdJ = document.createElement('td'); tdJ.textContent = vals.jug; tr.appendChild(tdJ);
-          const tdA = document.createElement('td'); tdA.textContent = vals.avg; tr.appendChild(tdA);
-
-          table.appendChild(tr);
-        });
-
-        grid.appendChild(table);
-      });
-
-      // Mostrar zona (para que html2canvas pueda medir tamaños)
-      document.getElementById('renderWrapper').style.display = 'block';
-      window.scrollTo({ top: document.getElementById('renderWrapper').offsetTop - 20, behavior: 'smooth' });
-    }
-
-    async function downloadTeamsBoardsPNG(){
-      if (!processedData.length){
-        return showError('Primero procesa “Totales y Medias Liga” y previsualiza.');
-      }
-      const area = document.getElementById('imgRenderArea');
-      if (!area.firstChild){
-        renderTeamsBoardsPreview(); // autogenera si no existe
-      }
-      // Espera un frame para que el DOM pinte
-      await new Promise(r => requestAnimationFrame(r));
-
-      const canvas = await html2canvas(area, {
-        backgroundColor: '#ffffff',
-        scale: 2,           // alta resolución
-        useCORS: true,
-      });
-      canvas.toBlob((blob)=>{
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const base = (fileNames && fileNames.length) ? fileNames.map(n=>n.replace(/\.xlsx$/,'')).join('_') : 'Liga';
-        a.download = `Clasificaciones_Equipos_${base}.png`;
-        a.href = url;
-        a.click();
-        URL.revokeObjectURL(url);
-      }, 'image/png');
     }
 
     // ===== Parser de logs (símbolos por delante de 'A' + equipos por orden alfabético) =====
@@ -854,22 +685,17 @@
 
       // Asignación a equipos por orden alfabético (símbolos antes de 'A')
       const teamsAlpha = Object.keys(teams).sort((a,b)=>cmpNick(a,b));
-
       let switched = false;
       if (players.length){
         players[0].team = teamsAlpha[0] || 'SinEquipo';
         let prevNick = players[0].name;
-
         for (let i=1; i<players.length; i++){
           const curr = players[i];
-          if (!switched && cmpNick(curr.name, prevNick) < 0) {
-            switched = true;
-          }
+          if (!switched && cmpNick(curr.name, prevNick) < 0) switched = true;
           curr.team = switched ? (teamsAlpha[1] || 'SinEquipo') : (teamsAlpha[0] || 'SinEquipo');
           prevNick = curr.name;
         }
       }
-
       return { teams, teamOrder, players };
     }
   </script>

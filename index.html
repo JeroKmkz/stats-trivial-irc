@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V12.3</title>
+  <title>Procesador de Logs de Trivial IRC — V13.1</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -96,6 +96,10 @@
       ws.views = [{ state: 'normal', showGridLines: false }];
       return ws;
     }
+
+    // Conversión aproximada px -> unidades de Excel (caracteres)
+    const PX_PER_CHAR = 7; // aproximación práctica
+    const widthFromPx = (px) => +(px / PX_PER_CHAR).toFixed(2);
 
     // ====== Comparador de nicks: símbolos (^[, etc.) antes que 'A' ======
     function normalizeNick(nick){
@@ -301,7 +305,7 @@
         const wb = new ExcelJS.Workbook();
 
         if (currentProcess === 'jornada'){
-          // Hoja Estadísticas (sin cuadrícula)
+          // Hoja Estadísticas (sin cuadrícula) — **ANCHOS RESTAURADOS**
           const ws = createWorksheetNoGrid(wb, 'Estadísticas');
           let currentRow = 1;
 
@@ -321,12 +325,12 @@
               return tt;
             });
 
-            // Cabecera
+            // Cabecera (fila títulos de columnas)
             const hdr = [''];
             teams.forEach((t,i)=>{ hdr.push(''); hdr.push('Puntos'); hdr.push('Scratches'); hdr.push('Palos'); hdr.push('Aces'); if(i<teams.length-1) hdr.push(''); });
             ws.getRow(currentRow).values = hdr;
 
-            // Totales por equipo (se mantienen ceros)
+            // Totales por equipo (mantener ceros)
             const tot = [''];
             teams.forEach((t,i)=>{ tot.push(t.name); tot.push(t.points); tot.push(teamTotals[i].scratches); tot.push(teamTotals[i].palos); tot.push(teamTotals[i].aces); if(i<teams.length-1) tot.push(''); });
             ws.getRow(currentRow+1).values = tot;
@@ -345,11 +349,7 @@
               col += (ti<teams.length-1)?6:5;
             });
 
-            const valOrBlank = (v, keepZero=false) => {
-              if (v == null) return '';
-              if (v === 0) return keepZero ? 0 : '';
-              return v;
-            };
+            const valOrBlank = (v, keepZero=false) => { if (v == null) return ''; if (v === 0) return keepZero ? 0 : ''; return v; };
 
             // Filas de jugadores (altura real del bloque)
             let rowsWritten = 0;
@@ -394,23 +394,21 @@
             currentRow += 2 + rowsWritten + 2;
           });
 
-          // Anchos + marco (margen 4.8; resto igual salvo separadores)
+          // >>> Anchos RESTAURADOS para 'Estadísticas' (no tocar)
           if (processedData.length>0){
             const tcount=processedData[0].teamOrder.length;
-            const widths=[4.8];
-            for(let i=0;i<tcount;i++){ widths.push(15,6.5,10,8,8); if(i<tcount-1) widths.push(6); } // estos anchos en “Estadísticas” no eran parte del cambio pedido
-            // Para que no falle, usamos los originales de la hoja de jornada:
-            // Col A padding + (por equipo) Nick 15, Puntos 8, Scratches 10, Palos 8, Aces 8, separador 6.
+            const widths=[3]; // margen inicial original
+            for(let i=0;i<tcount;i++){ widths.push(15,8,10,8,8); if(i<tcount-1) widths.push(6); }
             ws.columns = widths.map(w=>({width:w}));
             addFraming(ws, widths[0]);
           }
 
         } else if (currentProcess === 'totales'){
-          // ---- Hoja Totales (jugadores + equipos) ----
+          // ---- Hoja Totales ----
           const ws = createWorksheetNoGrid(wb, 'Totales');
           generateTotalsSheet(ws);
 
-          // ---- Hoja Totales2 (solo equipos fuente grande) ----
+          // ---- Hoja Totales2 (solo equipos, fuente grande) ----
           const ws2 = createWorksheetNoGrid(wb, 'Totales2');
           generateTotalsTeamsSheet(ws2, 14);
         }
@@ -611,29 +609,34 @@
         });
       });
 
-      // >>> ANCHOS Totales (margen 4.8; numéricos 6.5)
+      // >>> ANCHOS Totales basados en píxeles pedidos
+      const MARGIN_PX = 27; // margen izquierdo
+      const NUM_PX = 35;    // SCO/TOT/JUG/AVG
+      const marginW = widthFromPx(MARGIN_PX);
+      const numW = widthFromPx(NUM_PX);
+
       ws.columns = [
-        { width: 4.8 },
+        { width: marginW },
         // Jugadores (4 bloques x 4 columnas + separadores)
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
         // Separadores entre jugadores y equipos
         { width: 3 }, { width: 3 },
         // Equipos (PUNTOS con SCO)
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
         // POSTES
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
         // SCRATCHES con SCO
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
         // ACES
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }, { width: 3 },
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }, { width: 3 },
         // ASISTENCIA
-        { width: 15 }, { width: 6.5 }, { width: 6.5 }, { width: 6.5 }
+        { width: 15 }, { width: numW }, { width: numW }, { width: numW }
       ];
 
-      addFraming(ws, ws.columns[0]?.width || 4.8);
+      addFraming(ws, ws.columns[0]?.width || marginW);
     }
 
     // ===== Solo equipos (Totales2) fuente grande =====
@@ -698,19 +701,21 @@
         });
       });
 
-      // >>> ANCHOS Totales2 (numéricos 7.3 en vez de 9; resto igual)
+      // >>> ANCHOS Totales2: numéricos a 44 px
+      const NUM2_PX = 44;
+      const num2W = widthFromPx(NUM2_PX); // ~6.29
       ws.columns = [
-        { width: 2.25 }, // margen Totales2 lo mantenemos
+        { width: 2.25 }, // margen Totales2 lo mantenemos igual salvo que pidas cambio
         // PUNTOS (con SCO)
-        { width: 18 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 3 },
+        { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }, { width: num2W }, { width: 3 },
         // POSTES
-        { width: 18 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 3 },
+        { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }, { width: 3 },
         // SCRATCHES (con SCO)
-        { width: 18 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 3 },
+        { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }, { width: num2W }, { width: 3 },
         // ACES
-        { width: 18 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }, { width: 3 },
+        { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }, { width: 3 },
         // ASISTENCIA
-        { width: 18 }, { width: 7.3 }, { width: 7.3 }, { width: 7.3 }
+        { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }
       ];
       addFraming(ws, ws.columns[0]?.width || 2.25);
     }

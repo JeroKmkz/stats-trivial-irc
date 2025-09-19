@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V13.1</title>
+  <title>Procesador de Logs de Trivial IRC — V13.2</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -305,7 +305,7 @@
         const wb = new ExcelJS.Workbook();
 
         if (currentProcess === 'jornada'){
-          // Hoja Estadísticas (sin cuadrícula) — **ANCHOS RESTAURADOS**
+          // Hoja Estadísticas (sin cuadrícula) — anchos mantenidos
           const ws = createWorksheetNoGrid(wb, 'Estadísticas');
           let currentRow = 1;
 
@@ -325,17 +325,14 @@
               return tt;
             });
 
-            // Cabecera (fila títulos de columnas)
             const hdr = [''];
             teams.forEach((t,i)=>{ hdr.push(''); hdr.push('Puntos'); hdr.push('Scratches'); hdr.push('Palos'); hdr.push('Aces'); if(i<teams.length-1) hdr.push(''); });
             ws.getRow(currentRow).values = hdr;
 
-            // Totales por equipo (mantener ceros)
             const tot = [''];
             teams.forEach((t,i)=>{ tot.push(t.name); tot.push(t.points); tot.push(teamTotals[i].scratches); tot.push(teamTotals[i].palos); tot.push(teamTotals[i].aces); if(i<teams.length-1) tot.push(''); });
             ws.getRow(currentRow+1).values = tot;
 
-            // Estilos cabecera + totales
             let col=2; teams.forEach((t,ti)=>{
               for(let i=0;i<5;i++){ const c=ws.getCell(currentRow, col+i); c.font={bold:false,size:13}; c.alignment={horizontal:'center',vertical:'center'}; c.border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}; }
               for(let i=0;i<5;i++){
@@ -351,7 +348,6 @@
 
             const valOrBlank = (v, keepZero=false) => { if (v == null) return ''; if (v === 0) return keepZero ? 0 : ''; return v; };
 
-            // Filas de jugadores (altura real del bloque)
             let rowsWritten = 0;
             for(let i=0;i<10;i++){
               const hasAny = teams.some(t=>i<t.players.length);
@@ -365,8 +361,8 @@
                 if(p){
                   row.push(
                     p.name,
-                    p.absent ? '' : valOrBlank(p.points, true),     // puntos: 0 se muestra
-                    p.absent ? '' : valOrBlank(p.scratches, false), // resto: 0 => ''
+                    p.absent ? '' : valOrBlank(p.points, true),
+                    p.absent ? '' : valOrBlank(p.scratches, false),
                     p.absent ? '' : valOrBlank(p.palos, false),
                     p.absent ? '' : valOrBlank(p.aces, false)
                   );
@@ -390,25 +386,20 @@
               });
             }
 
-            // Siguiente bloque: 2 (cab+tot) + filas reales + 2 de separación
             currentRow += 2 + rowsWritten + 2;
           });
 
-          // >>> Anchos RESTAURADOS para 'Estadísticas' (no tocar)
           if (processedData.length>0){
             const tcount=processedData[0].teamOrder.length;
-            const widths=[3]; // margen inicial original
+            const widths=[3];
             for(let i=0;i<tcount;i++){ widths.push(15,8,10,8,8); if(i<tcount-1) widths.push(6); }
             ws.columns = widths.map(w=>({width:w}));
             addFraming(ws, widths[0]);
           }
 
         } else if (currentProcess === 'totales'){
-          // ---- Hoja Totales ----
           const ws = createWorksheetNoGrid(wb, 'Totales');
           generateTotalsSheet(ws);
-
-          // ---- Hoja Totales2 (solo equipos, fuente grande) ----
           const ws2 = createWorksheetNoGrid(wb, 'Totales2');
           generateTotalsTeamsSheet(ws2, 14);
         }
@@ -503,7 +494,6 @@
 
       function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
 
-      // Comparadores
       const byTotAvg = (getTot, getAvg) => (a,b)=>{
         const t = getTot(b) - getTot(a);
         if (t !== 0) return t;
@@ -549,6 +539,14 @@
           ws.getCell(row, b.baseCol+1).value = tot; ws.getCell(row, b.baseCol+1).alignment = { horizontal:'right' };
           ws.getCell(row, b.baseCol+2).value = gp;  ws.getCell(row, b.baseCol+2).alignment = { horizontal:'right' };
           ws.getCell(row, b.baseCol+3).value = avg; ws.getCell(row, b.baseCol+3).alignment = { horizontal:'right' };
+
+          // Numeración en margen IZQ solo para bloque PUNTOS (evita sobrescrituras)
+          if (b.title === 'PUNTOS'){
+            const rank = idx + 1;
+            const cell = ws.getCell(row, 1);
+            cell.value = (rank <= 33) ? `${rank}#` : '';
+            if (rank <= 10) cell.font = { bold: true };
+          }
         });
       });
 
@@ -579,14 +577,21 @@
       ];
 
       tBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+2).value = b.title;
+        // Título; centramos específicamente ASISTENCIA (y no molestamos el resto)
+        const ttl = ws.getCell(1, b.baseCol+2);
+        ttl.value = b.title;
+        if (b.title === 'ASISTENCIA') ttl.alignment = { horizontal: 'center' };
+
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
         if (b.hasSco){
           ws.getCell(2, b.baseCol+1).value = 'SCO';
           ws.getCell(2, b.baseCol+2).value = 'TOT';
           ws.getCell(2, b.baseCol+3).value = 'JUG';
           ws.getCell(2, b.baseCol+4).value = 'AVG';
-          [1,2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+          // SCO centrado (cabecera)
+          ws.getCell(2, b.baseCol+1).alignment = { horizontal:'center' };
+          // Resto a la derecha
+          [2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
         } else {
           ws.getCell(2, b.baseCol+1).value = 'TOT';
           ws.getCell(2, b.baseCol+2).value = 'JUG';
@@ -602,10 +607,10 @@
           nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
           const vals = b.pick(t);
           let colOff = 1;
-          if (b.hasSco){ ws.getCell(row, b.baseCol+colOff).value = vals.sco; ws.getCell(row, b.baseCol+colOff).alignment = { horizontal:'right' }; colOff++; }
-          ws.getCell(row, b.baseCol+colOff).value = vals.tot; ws.getCell(row, b.baseCol+colOff).alignment = { horizontal:'right' }; colOff++;
-          ws.getCell(row, b.baseCol+colOff).value = vals.jug; ws.getCell(row, b.baseCol+colOff).alignment = { horizontal:'right' }; colOff++;
-          ws.getCell(row, b.baseCol+colOff).value = vals.avg; ws.getCell(row, b.baseCol+colOff).alignment = { horizontal:'right' };
+          if (b.hasSco){ const c = ws.getCell(row, b.baseCol+colOff); c.value = vals.sco; c.alignment = { horizontal:'center' }; colOff++; }
+          const cTot = ws.getCell(row, b.baseCol+colOff); cTot.value = vals.tot; cTot.alignment = { horizontal:'right' }; colOff++;
+          const cJug = ws.getCell(row, b.baseCol+colOff); cJug.value = vals.jug; cJug.alignment = { horizontal:'right' }; colOff++;
+          const cAvg = ws.getCell(row, b.baseCol+colOff); cAvg.value = vals.avg; cAvg.alignment = { horizontal:'right' };
         });
       });
 
@@ -673,10 +678,11 @@
       tBlocks.forEach(b => {
         const ttl = ws.getCell(1, b.baseCol+2);
         ttl.value = b.title; ttl.font = { bold:true, size: fontSize };
+        if (b.title === 'ASISTENCIA') ttl.alignment = { horizontal: 'center' };
         ws.getCell(2, b.baseCol).value = 'EQUIPO';
         ws.getCell(2, b.baseCol).font = { bold:true, size: fontSize };
         if (b.hasSco){
-          ['SCO','TOT','JUG','AVG'].forEach((t,i)=>{ const c = ws.getCell(2, b.baseCol+1+i); c.value = t; c.alignment = { horizontal:'right' }; c.font = { bold:true, size: fontSize }; });
+          ['SCO','TOT','JUG','AVG'].forEach((t,i)=>{ const c = ws.getCell(2, b.baseCol+1+i); c.value = t; c.font = { bold:true, size: fontSize }; c.alignment = (i===0) ? { horizontal:'center' } : { horizontal:'right' }; });
         } else {
           ['TOT','JUG','AVG'].forEach((t,i)=>{ const c = ws.getCell(2, b.baseCol+1+i); c.value = t; c.alignment = { horizontal:'right' }; c.font = { bold:true, size: fontSize }; });
         }
@@ -694,7 +700,7 @@
 
           const vals = b.pick(t);
           let colOff = 1;
-          if (b.hasSco){ const c=ws.getCell(row, b.baseCol+colOff); c.value=vals.sco; c.alignment={horizontal:'right'}; c.font={size:fontSize}; colOff++; }
+          if (b.hasSco){ const c=ws.getCell(row, b.baseCol+colOff); c.value=vals.sco; c.alignment={horizontal:'center'}; c.font={size:fontSize}; colOff++; }
           const cTot = ws.getCell(row, b.baseCol+colOff); cTot.value = vals.tot; cTot.alignment={horizontal:'right'}; cTot.font={size:fontSize}; colOff++;
           const cJug = ws.getCell(row, b.baseCol+colOff); cJug.value = vals.jug; cJug.alignment={horizontal:'right'}; cJug.font={size:fontSize}; colOff++;
           const cAvg = ws.getCell(row, b.baseCol+colOff); cAvg.value = vals.avg; cAvg.alignment={horizontal:'right'}; cAvg.font={size:fontSize};
@@ -703,9 +709,9 @@
 
       // >>> ANCHOS Totales2: numéricos a 44 px
       const NUM2_PX = 44;
-      const num2W = widthFromPx(NUM2_PX); // ~6.29
+      const num2W = widthFromPx(NUM2_PX);
       ws.columns = [
-        { width: 2.25 }, // margen Totales2 lo mantenemos igual salvo que pidas cambio
+        { width: 2.25 },
         // PUNTOS (con SCO)
         { width: 18 }, { width: num2W }, { width: num2W }, { width: num2W }, { width: num2W }, { width: 3 },
         // POSTES
@@ -753,7 +759,6 @@
         });
       }
 
-      // Asignación por orden alfabético de equipo (símbolos antes de 'A')
       const teamsAlpha = Object.keys(teams).sort((a,b)=>cmpNick(a,b));
       let switched = false;
       if (players.length){

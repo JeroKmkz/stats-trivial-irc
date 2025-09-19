@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — Liga + GP</title>
+  <title>Procesador de Logs de Trivial IRC — Liga + GP (completo)</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -58,10 +58,10 @@
       <button class="button" onclick="processJornada()" id="processJornadaBtn" disabled>Procesar Jornada</button>
     </div>
 
-    <!-- PROCESO 2: Totales y Medias -->
+    <!-- PROCESO 2: Totales y Medias (Liga) -->
     <div class="upload-section" style="border-color: #28a745; background-color: #f8fff9;">
       <h3>🏆 Totales y Medias</h3>
-      <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados (Liga)</p>
+      <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados</p>
       <input type="file" id="fileInputTotales" accept=".xlsx" multiple />
       <br />
       <button class="button" onclick="processTotales()" id="processTotalesBtn" disabled style="background-color: #28a745;">Generar Totales</button>
@@ -75,7 +75,7 @@
   </div>
 
   <script>
-    // ===== Colores de equipos (Liga). Para GP usamos tonos neutros y encabezado con el nombre del grupo. =====
+    // ===== Colores de equipos (Liga) =====
     const COLORES_EQUIPOS = {
       "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
       "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
@@ -87,12 +87,13 @@
       "LIDERES": {"bg": "#C000C0", "fg": "#FFFFFF"}
     };
 
-    // === Estado global ===
-    let processedData = [];   // Liga: array de matches | GP: array de grupos
+    // === Estado ===
+    let processedData = [];
     let fileNames = [];
     let currentProcess = '';  // 'jornada' | 'totales'
     let competitionType = 'liga';
 
+    // ==== DOM ready ====
     document.addEventListener('DOMContentLoaded', () => {
       const inJ = document.getElementById('fileInputJornada');
       const inT = document.getElementById('fileInputTotales');
@@ -102,7 +103,6 @@
 
       if (inJ) inJ.addEventListener('change', () => { bJ.disabled = !(inJ.files && inJ.files.length); fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[]; currentProcess='jornada'; });
       if (inT) inT.addEventListener('change', () => { bT.disabled = !(inT.files && inT.files.length); fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[]; currentProcess='totales'; });
-
       if (sel) sel.addEventListener('change', () => { competitionType = sel.value || 'liga'; });
     });
 
@@ -110,7 +110,7 @@
     function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
     function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 
-    // ===== Utilidades ExcelJS / conversión de celdas =====
+    // ===== Excel helpers =====
     function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
     function norm(v){ return xlsToString(v).trim().toUpperCase(); }
     function numOrNull(v){ const s = xlsToString(v).replace(',','.').trim(); if(!s) return null; const n=Number(s); return Number.isFinite(n)?n:null; }
@@ -122,10 +122,10 @@
       return ws;
     }
 
-    // Conversión aproximada px -> “ancho Excel” (caracteres)
+    // px -> ancho Excel aproximado
     const PX_PER_CHAR = 7;
     const widthFromPx = (px) => +(px / PX_PER_CHAR).toFixed(2);
-    const NAME_W = widthFromPx(121); // 121 px para “NOMBRE” (Liga Totales/Jornada)
+    const NAME_W = widthFromPx(121); // 121px para “NOMBRE”
 
     // ====== Comparador de nicks: símbolos (^[, etc.) van antes que 'A' ======
     function normalizeNick(nick){
@@ -154,7 +154,9 @@
       try { ws.getRow(ws.lastRow.number).height = 7.5; } catch {}
     }
 
-    // ===== PROCESO 1: Jornada =====
+    // =========================================
+    // =========== PROCESO 1: Jornada ==========
+    // =========================================
     function processJornada(){
       const files = document.getElementById('fileInputJornada').files;
       if (!files || files.length === 0) return showError('Selecciona al menos un archivo .txt');
@@ -165,20 +167,18 @@
         reader.onload = (e)=>{
           try{
             const content = e.target.result;
-            if (competitionType === 'gp') {
+            if (competitionType === 'gp'){
               const groupData = parseGPLog(content); // 1 archivo = 1 grupo
               processedData[index] = groupData;
+              // Previa simple
+              displayGPResults(processedData);
             } else {
               const data = parseLogFileSymbols(content); // LIGA
               processedData[index] = data;
+              displayResults(processedData);
             }
             processed++;
             if (processed === files.length){
-              if (competitionType === 'gp') {
-                displayGPResults(processedData);
-              } else {
-                displayResults(processedData);
-              }
               document.getElementById('downloadSection').style.display='block';
               showSuccess(`${files.length} archivo${files.length>1?'s':''} procesado${files.length>1?'s':''} correctamente`);
             }
@@ -188,7 +188,9 @@
       });
     }
 
-    // ===== PROCESO 2: Totales (Liga) =====
+    // =========================================
+    // ========== PROCESO 2: Totales (Liga) ====
+    // =========================================
     async function processTotales(){
       if (competitionType !== 'liga'){
         showError('Totales/Medias solo están disponibles en modo Liga (aún no implementado para GP).');
@@ -220,7 +222,9 @@
       }catch(err){ showError('Error procesando archivos Excel: '+err.message); }
     }
 
-    // ===== Descarga Excel =====
+    // =========================================
+    // ============ DESCARGA EXCEL =============
+    // =========================================
     async function downloadExcel(){
       if (!processedData || processedData.length === 0) return showError('No hay datos procesados');
       try{
@@ -230,16 +234,15 @@
           if (competitionType === 'gp'){
             const ws = createWorksheetNoGrid(wb, 'GP');
             buildGPSheet(ws, processedData);
-          } else { // Liga
+          } else {
             const ws = createWorksheetNoGrid(wb, 'Estadísticas');
             buildJornadaSheet(ws, processedData);
           }
         } else if (currentProcess === 'totales'){
-          // Liga totales (igual que tenías)
           const ws = createWorksheetNoGrid(wb, 'Totales');
-          generateTotalsSheet(ws);
+          generateTotalsSheet(ws);       // COMPLETO (Liga)
           const ws2 = createWorksheetNoGrid(wb, 'Totales2');
-          generateTotalsTeamsSheet(ws2, 14);
+          generateTotalsTeamsSheet(ws2); // COMPLETO (Liga)
         }
 
         const buffer = await wb.xlsx.writeBuffer();
@@ -258,11 +261,9 @@
       }catch(err){ console.error(err); showError('Error generando Excel: '+err.message); }
     }
 
-    // =======================
-    // ======= LIGA ==========
-    // =======================
-
-    // (1) Lector desde “Estadísticas” (Excel jornada de Liga) para Totales Liga
+    // =========================================================
+    // ==================== PARSERS LIGA =======================
+    // =========================================================
     function findHeaderStartCol(row){
       const n = row.actualCellCount || row.cellCount || 100;
       for (let c=1; c<=n; c++){
@@ -274,6 +275,7 @@
       }
       return -1;
     }
+
     function extractDataFromExcel(worksheet){
       const matches = []; let currentRow = 1; const maxR = worksheet.rowCount || 10000;
       while (currentRow <= maxR){
@@ -282,13 +284,14 @@
         if (startCol !== -1){
           const m = extractSingleMatch(worksheet, currentRow, startCol);
           if (m) matches.push(m);
-          currentRow = currentRow + 1; // altura variable; avanzamos de uno en uno
+          currentRow = currentRow + 1; // altura variable
         } else {
           currentRow++;
         }
       }
       return matches;
     }
+
     function extractSingleMatch(worksheet, startRow, startCol){
       try{
         const teamRow = worksheet.getRow(startRow + 1);
@@ -317,7 +320,7 @@
       }catch(e){ console.error('extractSingleMatch error', e); return null; }
     }
 
-    // (2) Vista previa Totales Liga breve
+    // ================= PREVIEW LIGA (Jornada / Totales) =================
     function displayTotalesOnlyResults(){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML='';
       const allPlayers = new Set(); let totalMatches = processedData.length;
@@ -331,7 +334,6 @@
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
-    // (3) Vista previa Jornada Liga (igual que tenías)
     function displayResults(allData){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML = '';
       const info = document.createElement('div'); info.className = 'log-info';
@@ -381,9 +383,10 @@
       showSuccess(`${allData.length} partida${allData.length>1?'s':''} procesada${allData.length>1?'s':''} correctamente`);
     }
 
-    // (4) Construcción hoja “Estadísticas” Liga
+    // ==================== EXCEL “Estadísticas” LIGA =====================
     function buildJornadaSheet(ws, matches){
-      const widths = [3, NAME_W, 8, 10, 8, 8, 6, NAME_W, 8, 10, 8, 8];
+      // Columnas: padding | (nombre,pts,scr,palos,aces) x team + separador | ... (NOMBRE=121px)
+      const widths = [widthFromPx(27), NAME_W, 8, 10, 8, 8, 6, NAME_W, 8, 10, 8, 8];
       ws.columns = widths.map(w=>({width:w}));
       let currentRow = 1;
 
@@ -472,39 +475,306 @@
         }
 
         const usedRows = 2 + maxPlayers;
-        currentRow += usedRows + 2;
+        currentRow += usedRows + 2; // exactamente 2 filas en blanco tras la última fila de datos
       });
 
       addFraming(ws, ws.columns[0]?.width || 3);
     }
 
-    // (5) Totales Liga (ya integrados previamente)
+    // ====================== AGREGADOS Totales/Medias LIGA ======================
+    function aggregatePlayersFromProcessed(data){
+      const players = {};
+      data.forEach(match=>{
+        match.players.forEach(p=>{
+          if (!p.absent){
+            if (!players[p.name]) players[p.name] = { name:p.name, team:p.team, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,gamesPlayed:0 };
+            const rec = players[p.name];
+            rec.team=p.team;
+            rec.totalPoints += p.points||0;
+            rec.totalPalos += p.palos||0;
+            rec.totalScratches += p.scratches||0;
+            rec.totalAces += p.aces||0;
+            rec.gamesPlayed += 1;
+          }
+        });
+      });
+      return Object.values(players).map(p=>({
+        ...p,
+        avgPoints: p.gamesPlayed? p.totalPoints/p.gamesPlayed:0,
+        avgPalos: p.gamesPlayed? p.totalPalos/p.gamesPlayed:0,
+        avgScratches: p.gamesPlayed? p.totalScratches/p.gamesPlayed:0,
+        avgAces: p.gamesPlayed? p.totalAces/p.gamesPlayed:0
+      }));
+    }
+
+    function aggregateTeamsFromProcessed(data){
+      const teamTotals = {};
+      function awardSco(a, b){ if (a > b) return [3,1]; if (a < b) return [1,3]; return [2,2]; }
+      data.forEach(match=>{
+        match.teamOrder.forEach(teamName=>{
+          if (!teamTotals[teamName]) teamTotals[teamName] = { name:teamName, totalPoints:0,totalPalos:0,totalScratches:0,totalAces:0,totalAsistencia:0,gamesPlayed:0, scoPuntos:0, scoScratches:0 };
+        });
+
+        // SCO Puntos
+        if (match.teamOrder.length >= 2){
+          const A = match.teamOrder[0], B = match.teamOrder[1];
+          const pA = +(match.teams[A] || 0), pB = +(match.teams[B] || 0);
+          const [sA, sB] = awardSco(pA, pB);
+          teamTotals[A].scoPuntos += sA; teamTotals[B].scoPuntos += sB;
+        }
+
+        // stats de equipo + SCR para SCO
+        const scratchesByTeam = {};
+        match.teamOrder.forEach(teamName=>{
+          teamTotals[teamName].totalPoints += match.teams[teamName] || 0;
+          const teamPlayers = match.players.filter(p=>p.team===teamName && !p.absent);
+          teamTotals[teamName].totalAsistencia += teamPlayers.length;
+          teamTotals[teamName].gamesPlayed += 1;
+          let scrSum = 0;
+          teamPlayers.forEach(p=>{
+            teamTotals[teamName].totalPalos += p.palos||0;
+            teamTotals[teamName].totalScratches += p.scratches||0; scrSum += p.scratches||0;
+            teamTotals[teamName].totalAces += p.aces||0;
+          });
+          scratchesByTeam[teamName] = scrSum;
+        });
+
+        // SCO Scratches
+        if (match.teamOrder.length >= 2){
+          const A = match.teamOrder[0], B = match.teamOrder[1];
+          const sA = scratchesByTeam[A] || 0, sB = scratchesByTeam[B] || 0;
+          const [sa, sb] = awardSco(sA, sB);
+          teamTotals[A].scoScratches += sa; teamTotals[B].scoScratches += sb;
+        }
+      });
+
+      return Object.values(teamTotals).map(t=>({
+        ...t,
+        avgPoints: t.gamesPlayed? t.totalPoints/t.gamesPlayed:0,
+        avgPalos: t.gamesPlayed? t.totalPalos/t.gamesPlayed:0,
+        avgScratches: t.gamesPlayed? t.totalScratches/t.gamesPlayed:0,
+        avgAces: t.gamesPlayed? t.totalAces/t.gamesPlayed:0,
+        avgAsistencia: t.gamesPlayed? t.totalAsistencia/t.gamesPlayed:0
+      }));
+    }
+
+    // ================ Totales (jugadores + equipos) — Hoja “Totales” =================
     function generateTotalsSheet(ws){
-      // … (se mantiene tu implementación buena – omitido por brevedad en este bloque)
-      // Nota: si necesitas que copie aquí toda la parte de Totales que ya tenías OK, dímelo
-      // y te pego de nuevo la versión completa sin recortar.
-      ws.getCell(1,1).value = 'Totales Liga – (contenido intacto de tu versión previa)';
-    }
-    function generateTotalsTeamsSheet(ws, baseFont=14){
-      ws.getCell(1,1).value = 'Totales2 Liga – (contenido intacto de tu versión previa)';
+      const players = aggregatePlayersFromProcessed(processedData);
+      const teamsArr = aggregateTeamsFromProcessed(processedData);
+
+      function getTeamColors(teamName){ return COLORES_EQUIPOS[teamName] || { bg:'#000000', fg:'#FFFFFF' }; }
+
+      // Anchuras (px equivalentes): margen 27px; num 35px; nombre 121px; separadores 21px
+      const MARGIN = widthFromPx(27);
+      const NUM = widthFromPx(35);
+      const SEP = widthFromPx(21);
+      ws.columns = [
+        { width: MARGIN }, // margen izq (con #posiciones)
+        // Jugadores
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // separadores grandes entre bloques jugadores/equipos
+        { width: SEP }, { width: SEP },
+        // Equipos (PUNTOS con SCO)
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // POSTES
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // SCRATCHES con SCO
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // ACES
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // ASISTENCIA
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }
+      ];
+
+      // ===== BLOQUES JUGADORES =====
+      const pBlocks = [
+        { title:'PUNTOS',     baseCol:2,  sort:(a,b)=> (b.totalPoints - a.totalPoints) || (b.avgPoints - a.avgPoints), pick:(p)=>[p.totalPoints,p.gamesPlayed,+p.avgPoints.toFixed(1)] },
+        { title:'POSTES',     baseCol:7,  sort:(a,b)=> (b.totalPalos  - a.totalPalos ) || (b.avgPalos  - a.avgPalos ), pick:(p)=>[p.totalPalos,p.gamesPlayed,+p.avgPalos.toFixed(1)] },
+        { title:'SCRATCHES',  baseCol:12, sort:(a,b)=> (b.totalScratches - a.totalScratches) || (b.avgScratches - a.avgScratches), pick:(p)=>[p.totalScratches,p.gamesPlayed,+p.avgScratches.toFixed(1)] },
+        { title:'ACES',       baseCol:17, sort:(a,b)=> (b.totalAces  - a.totalAces ) || (b.avgAces  - a.avgAces ), pick:(p)=>[p.totalAces,p.gamesPlayed,+p.avgAces.toFixed(1)] }
+      ];
+
+      // Encabezados + datos
+      pBlocks.forEach(b => {
+        ws.getCell(1, b.baseCol+2).value = b.title;
+        ws.getCell(2, b.baseCol).value = 'NOMBRE';
+        ws.getCell(2, b.baseCol+1).value = 'TOT';
+        ws.getCell(2, b.baseCol+2).value = 'JUG';
+        ws.getCell(2, b.baseCol+3).value = 'AVG';
+        ws.getCell(2, b.baseCol+1).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+2).alignment = { horizontal: 'right' };
+        ws.getCell(2, b.baseCol+3).alignment = { horizontal: 'right' };
+
+        const data = [...players].sort(b.sort);
+
+        // #posición en la columna de margen (centrado, 1 punto menos; negrita hasta #10)
+        const fontBase = 11;            // el que ya usas
+        const fontSmall = fontBase - 1; // “un punto menor”
+        data.forEach((p, idx)=>{
+          const row = 3 + idx;
+          const colors = getTeamColors(p.team);
+
+          // #pos hasta 33 (dos filas finas después)
+          const posIdx = idx + 1;
+          if (posIdx <= 33){
+            const colPos = 1; // margen
+            const c = ws.getCell(row+1, colPos); // +1 porque fila 1 es título y fila 2 cabeceras
+            c.value = `#${posIdx}`;
+            c.font = { bold: posIdx<=10, size: fontSmall };
+            c.alignment = { horizontal:'center' };
+          }
+
+          const nameCell = ws.getCell(row+1, b.baseCol);
+          nameCell.value = p.name;
+          nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
+          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+
+          const [tot,gp,avg] = b.pick(p);
+          ws.getCell(row+1, b.baseCol+1).value = tot; ws.getCell(row+1, b.baseCol+1).alignment = { horizontal:'right' };
+          ws.getCell(row+1, b.baseCol+2).value = gp;  ws.getCell(row+1, b.baseCol+2).alignment = { horizontal:'right' };
+          ws.getCell(row+1, b.baseCol+3).value = avg; ws.getCell(row+1, b.baseCol+3).alignment = { horizontal:'right' };
+        });
+
+        // Inserta dos filas finas tras el #33 si hay más de 33 filas
+        if (players.length > 33){
+          const cutRow = 36; // 2 cabeceras + 33 datos = 35
+          ws.spliceRows(cutRow, 0, [], []);
+          try { ws.getRow(cutRow).height = 7.5; ws.getRow(cutRow+1).height = 7.5; } catch {}
+        }
+      });
+
+      // ===== BLOQUES EQUIPOS ===== (orden SCO→TOT→AVG donde aplique)
+      const tBlocks = [
+        { title:'PUNTOS',     baseCol:24, hasSco:true,  sort:(a,b)=> (b.scoPuntos - a.scoPuntos) || (b.totalPoints - a.totalPoints) || (b.avgPoints - a.avgPoints), pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
+        { title:'POSTES',     baseCol:30, hasSco:false, sort:(a,b)=> (b.totalPalos  - a.totalPalos ) || (b.avgPalos - a.avgPalos), pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:35, hasSco:true,  sort:(a,b)=> (b.scoScratches - a.scoScratches) || (b.totalScratches - a.totalScratches) || (b.avgScratches - a.avgScratches), pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'ACES',       baseCol:41, hasSco:false, sort:(a,b)=> (b.totalAces  - a.totalAces ) || (b.avgAces - a.avgAces), pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
+        { title:'ASISTENCIA', baseCol:46, hasSco:false, sort:(a,b)=> (b.totalAsistencia - a.totalAsistencia) || (b.avgAsistencia - a.avgAsistencia), pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
+      ];
+
+      tBlocks.forEach(b => {
+        ws.getCell(1, b.baseCol+2).value = b.title;
+        ws.getCell(2, b.baseCol).value = 'EQUIPO';
+        if (b.hasSco){
+          ws.getCell(2, b.baseCol+1).value = 'SCO';
+          ws.getCell(2, b.baseCol+1).alignment = { horizontal:'center' }; // centrado SCO
+          ws.getCell(2, b.baseCol+2).value = 'TOT';
+          ws.getCell(2, b.baseCol+3).value = 'JUG';
+          ws.getCell(2, b.baseCol+4).value = 'AVG';
+          [2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        } else {
+          ws.getCell(2, b.baseCol+1).value = 'TOT';
+          ws.getCell(2, b.baseCol+2).value = 'JUG';
+          ws.getCell(2, b.baseCol+3).value = 'AVG';
+          [1,2,3].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        }
+        if (b.title==='ASISTENCIA'){ ws.getCell(1, b.baseCol+2).alignment = { horizontal:'center' }; } // título centrado (petición reciente)
+
+        const data = [...teamsArr].sort(b.sort);
+        data.forEach((t, idx)=>{
+          const row = idx + 3; const colors = getTeamColors(t.name);
+          const nameCell = ws.getCell(row, b.baseCol);
+          nameCell.value = t.name;
+          nameCell.font = { color:{ argb: colors.fg.replace('#','FF') } };
+          nameCell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          let c = b.baseCol+1;
+          if (b.hasSco){ ws.getCell(row, c).value = t.scoPuntos || t.scoScratches || 0; ws.getCell(row, c).alignment={horizontal:'center'}; c++; }
+          const vals = b.pick(t);
+          ws.getCell(row, c).value = vals.tot; ws.getCell(row, c).alignment = { horizontal:'right' }; c++;
+          ws.getCell(row, c).value = vals.jug; ws.getCell(row, c).alignment = { horizontal:'right' }; c++;
+          ws.getCell(row, c).value = vals.avg; ws.getCell(row, c).alignment = { horizontal:'right' };
+        });
+      });
+
+      // Marco
+      addFraming(ws, ws.columns[0]?.width || widthFromPx(27));
     }
 
-    // =======================
-    // ========= GP ==========
-    // =======================
+    // ============= Totales2 (equipos con fuente más grande) =============
+    function generateTotalsTeamsSheet(ws){
+      // En Totales2 usamos tipografía mayor; replicamos columnas pero ajustamos numéricas a ~44px
+      const MARGIN = widthFromPx(27);
+      const NUM = widthFromPx(44); // “en la misma proporción” respecto a Totales
+      const SEP = widthFromPx(21);
+      ws.columns = [
+        { width: MARGIN },
+        // PUNTOS + SCO
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // POSTES
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // SCRATCHES + SCO
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // ACES
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }, { width: SEP },
+        // ASISTENCIA
+        { width: NAME_W }, { width: NUM }, { width: NUM }, { width: NUM }
+      ];
 
-    // GP: parsea un único grupo por archivo (.txt)
+      const teamsArr = aggregateTeamsFromProcessed(processedData);
+      const tBlocks = [
+        { title:'PUNTOS',     baseCol:2,  hasSco:true,  sort:(a,b)=> (b.scoPuntos - a.scoPuntos) || (b.totalPoints - a.totalPoints) || (b.avgPoints - a.avgPoints), pick:(t)=>({ sco:t.scoPuntos||0,    tot:t.totalPoints,    jug:t.gamesPlayed, avg:+t.avgPoints.toFixed(1) }) },
+        { title:'POSTES',     baseCol:8,  hasSco:false, sort:(a,b)=> (b.totalPalos  - a.totalPalos ) || (b.avgPalos - a.avgPalos), pick:(t)=>({ tot:t.totalPalos,      jug:t.gamesPlayed, avg:+t.avgPalos.toFixed(1) }) },
+        { title:'SCRATCHES',  baseCol:13, hasSco:true,  sort:(a,b)=> (b.scoScratches - a.scoScratches) || (b.totalScratches - a.totalScratches) || (b.avgScratches - a.avgScratches), pick:(t)=>({ sco:t.scoScratches||0, tot:t.totalScratches, jug:t.gamesPlayed, avg:+t.avgScratches.toFixed(1) }) },
+        { title:'ACES',       baseCol:19, hasSco:false, sort:(a,b)=> (b.totalAces  - a.totalAces ) || (b.avgAces - a.avgAces), pick:(t)=>({ tot:t.totalAces,       jug:t.gamesPlayed, avg:+t.avgAces.toFixed(1) }) },
+        { title:'ASISTENCIA', baseCol:24, hasSco:false, sort:(a,b)=> (b.totalAsistencia - a.totalAsistencia) || (b.avgAsistencia - a.avgAsistencia), pick:(t)=>({ tot:t.totalAsistencia, jug:t.gamesPlayed, avg:+t.avgAsistencia.toFixed(1) }) }
+      ];
+
+      tBlocks.forEach(b=>{
+        ws.getCell(1, b.baseCol+2).value = b.title;
+        ws.getCell(2, b.baseCol).value = 'EQUIPO';
+        if (b.hasSco){
+          ws.getCell(2, b.baseCol+1).value = 'SCO';
+          ws.getCell(2, b.baseCol+1).alignment = { horizontal:'center' };
+          ws.getCell(2, b.baseCol+2).value = 'TOT';
+          ws.getCell(2, b.baseCol+3).value = 'JUG';
+          ws.getCell(2, b.baseCol+4).value = 'AVG';
+          [2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        } else {
+          ws.getCell(2, b.baseCol+1).value = 'TOT';
+          ws.getCell(2, b.baseCol+2).value = 'JUG';
+          ws.getCell(2, b.baseCol+3).value = 'AVG';
+          [1,2,3].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
+        }
+        if (b.title==='ASISTENCIA'){ ws.getCell(1, b.baseCol+2).alignment = { horizontal:'center' }; }
+
+        const data = [...teamsArr].sort(b.sort);
+        data.forEach((t, idx)=>{
+          const row = idx + 3;
+          const colors = COLORES_EQUIPOS[t.name] || { bg:'#000000', fg:'#FFFFFF' };
+          const nc = ws.getCell(row, b.baseCol);
+          nc.value = t.name;
+          nc.font = { color:{ argb: colors.fg.replace('#','FF') } };
+          nc.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: colors.bg.replace('#','FF') } };
+          let c = b.baseCol+1;
+          if (b.hasSco){ ws.getCell(row, c).value = t.scoPuntos || t.scoScratches || 0; ws.getCell(row, c).alignment={horizontal:'center'}; c++; }
+          const vals = b.pick(t);
+          ws.getCell(row, c).value = vals.tot; ws.getCell(row, c).alignment = { horizontal:'right' }; c++;
+          ws.getCell(row, c).value = vals.jug; ws.getCell(row, c).alignment = { horizontal:'right' }; c++;
+          ws.getCell(row, c).value = vals.avg; ws.getCell(row, c).alignment = { horizontal:'right' };
+        });
+      });
+
+      addFraming(ws, ws.columns[0]?.width || widthFromPx(27));
+    }
+
+    // =========================================================
+    // ======================== GP =============================
+    // =========================================================
+    // Parser GP (1 archivo = 1 grupo)
     function parseGPLog(text){
       const lines = String(text).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
       const idxCE = lines.findIndex(l => /^CLASIFICACION\s+EQUIPOS$/i.test(l));
       const idxCI = lines.findIndex(l => /^CLASIFICACION\s+INDIVIDUAL$/i.test(l));
       if (idxCE === -1 || idxCI === -1) throw new Error('Secciones no encontradas');
 
-      // Línea siguiente al CE trae "GRUPO X   total"
       const m = /^(GRUPO\s+[A-ZÁÉÍÓÚÑ]+)\s+(-?\d+)/i.exec(lines[idxCE+1] || '');
       const groupName = m ? m[1].toUpperCase() : 'GRUPO';
 
-      // Jugadores (presentes/ausentes). Formato como en liga.
+      // Jugadores
       const rePresent = /^(\S[\S ]*?)(?:\s{2,}|\t+)(-?\d+)\s+.*?Aces:\s*(\d+)\s+Scr:\s*(\d+)\s+Palos:\s*(\d+)/i;
       const reAbsent  = /^(\S[\S ]*?)(?:\s{2,}|\t+)0\s+NO\s+ESTUVO\s+PRESENTE/i;
 
@@ -518,7 +788,7 @@
             pts: parseInt(mm[2],10) || 0,
             aces: parseInt(mm[3],10) || 0,
             scr:  parseInt(mm[4],10) || 0,
-            pos:  parseInt(mm[5],10) || 0, // POS = postes
+            pos:  parseInt(mm[5],10) || 0,
             present: true
           });
           continue;
@@ -534,9 +804,8 @@
       }
       if (!players.length) throw new Error('No se detectaron líneas de jugadores');
 
-      // Ranking por PTS desc (solo presentes). Ausentes al final (todo a 0).
+      // Ranking por PTS desc (presentes) con empates por media de GPP
       const presents = players.filter(p=>p.present).sort((a,b)=> b.pts - a.pts);
-      // Ties: asignamos posición y GPP por media
       const gppTable = [20,17,15,13,11,10,9,8,7,6,5,4,3,2,1]; // 1..15
       function avgGPP(start, end){
         let sum = 0, count = 0;
@@ -546,7 +815,6 @@
         }
         return sum / count;
       }
-      // asignar posición y gpp
       let i = 0, currPos = 1;
       while (i < presents.length){
         let j = i+1;
@@ -555,25 +823,19 @@
         const endPos = currPos + (j - i) - 1;
         const gpp = avgGPP(startPos, endPos);
         for (let k = i; k < j; k++){
-          presents[k].rank = startPos;         // posición mínima del bloque
-          presents[k].gpp = +gpp.toFixed(2);   // redondeo 2 decimales (18.5, 11.33…)
+          presents[k].rank = startPos;
+          presents[k].gpp = +gpp.toFixed(2);
         }
         currPos = endPos + 1;
         i = j;
       }
-      // Ausentes
       const absents = players.filter(p=>!p.present).map(p=>({ ...p, rank: null, gpp: 0 }));
-
-      // Resultado final: presentes con rank/gpp + ausentes
       const finalPlayers = [...presents, ...absents];
 
-      return {
-        group: groupName,  // p.ej. "GRUPO B"
-        players: finalPlayers
-      };
+      return { group: groupName, players: finalPlayers };
     }
 
-    // Vista previa básica GP
+    // Previa GP
     function displayGPResults(groups){
       const resultsDiv = document.getElementById('results'); resultsDiv.innerHTML='';
       const info = document.createElement('div'); info.className='log-info';
@@ -583,45 +845,40 @@
       resultsDiv.appendChild(info); resultsDiv.style.display='block';
     }
 
-    // Construcción de la hoja GP (dos grupos por fila; columnas: GPP, PTS, POS, SCR, ACE)
+    // Hoja GP (dos grupos por fila)
     function buildGPSheet(ws, groups){
-      // Dimensiones/anchos: bloque por grupo = 1 col título + 6 columnas de datos aprox + separador
-      // Haremos un bloque de 6 columnas de datos + 1 separador. Dos bloques por fila.
-      const NAME_W_GP = widthFromPx(121); // nombre
-      const NUM_W_GP  = widthFromPx(35);  // columnas numéricas
-      const SEP_W     = 3;
+      const NAME_W_GP = widthFromPx(121);
+      const NUM_W_GP  = widthFromPx(35);
+      const SEP_W     = widthFromPx(21);
 
-      // Prepara ancho de 2 bloques por fila (izq y dcha) + margen inicial + columna final
       ws.columns = [
-        { width: widthFromPx(27) }, // margen
-        // Bloque A (Nombre + GPP + PTS + POS + SCR + ACE)
+        { width: widthFromPx(27) },
+        // Bloque A
         { width: NAME_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: SEP_W },
         // Bloque B
         { width: NAME_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }, { width: NUM_W_GP }
       ];
 
-      let row = 2; // 1 reservada para el marco superior (lo pondremos al final con addFraming)
+      let row = 2;
       for (let idx = 0; idx < groups.length; idx += 2){
         const left = groups[idx];
         const right = groups[idx+1];
 
-        // Encabezados de grupo (en negrita y centrado sobre el nombre)
         if (left){
           const c = (r,c)=>ws.getCell(r,c);
           c(row, 2).value = left.group;
           c(row, 2).font = { bold:true, size: 13 };
           c(row, 2).alignment = { horizontal:'center' };
-          ws.mergeCells(row,2,row,7); // título sobre el bloque izquierdo
+          ws.mergeCells(row,2,row,7);
         }
         if (right){
           const c = (r,c)=>ws.getCell(r,c);
           c(row, 9).value = right.group;
           c(row, 9).font = { bold:true, size: 13 };
           c(row, 9).alignment = { horizontal:'center' };
-          ws.mergeCells(row,9,row,14); // título sobre el bloque derecho
+          ws.mergeCells(row,9,row,14);
         }
 
-        // Fila de cabeceras de columnas
         const headRow = row + 1;
         if (left){
           ws.getRow(headRow).getCell(2).value = 'NOMBRE';
@@ -650,26 +907,20 @@
           }
         }
 
-        // Cuerpos: orden por PTS desc, ausentes al final
         const renderGroup = (g, startCol) => {
           const present = g.players.filter(p=>p.present).sort((a,b)=> b.pts - a.pts);
           const absent  = g.players.filter(p=>!p.present);
           const ordered = [...present, ...absent];
-
           let r = headRow + 1;
           ordered.forEach(p=>{
             ws.getCell(r, startCol+0).value = p.name;
             ws.getCell(r, startCol+0).alignment = { horizontal:'left' };
-
             ws.getCell(r, startCol+1).value = p.present ? p.gpp : 0;
             ws.getCell(r, startCol+2).value = p.present ? p.pts : 0;
-            ws.getCell(r, startCol+3).value = p.present ? p.pos : 0; // POS = postes
+            ws.getCell(r, startCol+3).value = p.present ? p.pos : 0;
             ws.getCell(r, startCol+4).value = p.present ? p.scr : 0;
             ws.getCell(r, startCol+5).value = p.present ? p.aces : 0;
-
-            // numéricas derecha
             for (let off=1; off<=5; off++) ws.getCell(r, startCol+off).alignment = { horizontal:'right' };
-
             r++;
           });
           return (ordered.length);
@@ -677,18 +928,15 @@
 
         const leftRows  = left  ? renderGroup(left, 2)  : 0;
         const rightRows = right ? renderGroup(right, 9) : 0;
-        row = Math.max(row + 2 + Math.max(leftRows, rightRows), row + 2) + 2; // deja 2 filas de separación
+        row = Math.max(row + 2 + Math.max(leftRows, rightRows), row + 2) + 2;
       }
 
-      // Marco
       addFraming(ws, ws.columns[0]?.width || widthFromPx(27));
     }
 
-    // ======================
-    // ====== PARSERS =======
-    // ======================
-
-    // Liga: parser (símbolos por delante de 'A' + equipos por orden alfabético)
+    // =========================================================
+    // ============== PARSER LIGA (texto .txt) =================
+    // =========================================================
     function parseLogFileSymbols(content){
       const lines = content.split('\n').map(l=>l.trim()).filter(Boolean);
       const teamStart = lines.findIndex(l=>/CLASIFICACION\s+EQUIPOS/i.test(l));

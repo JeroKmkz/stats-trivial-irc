@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V13.2</title>
+  <title>Procesador de Logs de Trivial IRC — V13.3</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
@@ -520,8 +520,15 @@
       ];
 
       pBlocks.forEach(b => {
-        ws.getCell(1, b.baseCol+2).value = b.title;
-        ws.getCell(2, b.baseCol).value = 'NOMBRE';
+        // Título del bloque
+        const titleCell = ws.getCell(1, b.baseCol+2);
+        titleCell.value = b.title;
+        if (b.title === 'SCRATCHES') { // centrar cabecera "SCRATCHES" (individuales)
+          titleCell.alignment = { horizontal: 'center' };
+        }
+
+        // Encabezados de columnas
+        ws.getCell(2, b.baseCol).value   = 'NOMBRE';
         ws.getCell(2, b.baseCol+1).value = 'TOT';
         ws.getCell(2, b.baseCol+2).value = 'JUG';
         ws.getCell(2, b.baseCol+3).value = 'AVG';
@@ -540,12 +547,13 @@
           ws.getCell(row, b.baseCol+2).value = gp;  ws.getCell(row, b.baseCol+2).alignment = { horizontal:'right' };
           ws.getCell(row, b.baseCol+3).value = avg; ws.getCell(row, b.baseCol+3).alignment = { horizontal:'right' };
 
-          // Numeración en margen IZQ solo para bloque PUNTOS (evita sobrescrituras)
+          // Numeración margen IZQ solo en bloque PUNTOS (#1..#33), centrada y 1pt menor (≈10)
           if (b.title === 'PUNTOS'){
             const rank = idx + 1;
-            const cell = ws.getCell(row, 1);
-            cell.value = (rank <= 33) ? `${rank}#` : '';
-            if (rank <= 10) cell.font = { bold: true };
+            const c = ws.getCell(row, 1);
+            c.value = (rank <= 33) ? `#${rank}` : '';
+            c.alignment = { horizontal:'center' };
+            c.font = (rank <= 10) ? { bold:true, size:10 } : { size:10 };
           }
         });
       });
@@ -577,7 +585,6 @@
       ];
 
       tBlocks.forEach(b => {
-        // Título; centramos específicamente ASISTENCIA (y no molestamos el resto)
         const ttl = ws.getCell(1, b.baseCol+2);
         ttl.value = b.title;
         if (b.title === 'ASISTENCIA') ttl.alignment = { horizontal: 'center' };
@@ -588,9 +595,7 @@
           ws.getCell(2, b.baseCol+2).value = 'TOT';
           ws.getCell(2, b.baseCol+3).value = 'JUG';
           ws.getCell(2, b.baseCol+4).value = 'AVG';
-          // SCO centrado (cabecera)
-          ws.getCell(2, b.baseCol+1).alignment = { horizontal:'center' };
-          // Resto a la derecha
+          ws.getCell(2, b.baseCol+1).alignment = { horizontal:'center' }; // SCO centrado
           [2,3,4].forEach(off=> ws.getCell(2, b.baseCol+off).alignment = { horizontal:'right' });
         } else {
           ws.getCell(2, b.baseCol+1).value = 'TOT';
@@ -738,8 +743,8 @@
         const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
         if (!m) continue;
         const team = m[1].trim();
-        const points = parseInt(m[2], 10);
-        teams[team] = points;
+        thePoints = parseInt(m[2], 10);
+        teams[team] = thePoints;
         teamOrder.push(team);
       }
 

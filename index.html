@@ -187,24 +187,32 @@
     function cmpNick(a,b){ const A = nickKey(a), B = nickKey(b); return A.localeCompare(B,'es',{sensitivity:'base',numeric:true}); }
 
     // Marco común: fila arriba/abajo + columna izquierda/derecha
-    function addFraming(ws, padWidth){
-      if (Array.isArray(ws.columns) && ws.columns.length){
-        const width = padWidth ?? ws.columns[0]?.width ?? 2.25;
-        
-        // Columna izquierda (índice 0)
-        if (!ws.columns[0] || ws.columns[0].width === undefined) {
-          ws.columns[0] = { width };
-        }
-        
-        // Columna derecha
-        ws.columns.push({ width });
-        
-        // Fila superior
+    function addFraming(ws, padWidth = 2.25){
+      // Configurar columnas si no están configuradas
+      if (!ws.columns || ws.columns.length === 0) {
+        ws.columns = [{ width: padWidth }];
+      }
+      
+      // Asegurar que la primera columna tenga el ancho correcto
+      if (ws.columns[0]) {
+        ws.columns[0].width = padWidth;
+      }
+      
+      // Añadir columna al final
+      const currentColumns = ws.columns.length;
+      ws.getColumn(currentColumns + 1).width = padWidth;
+      
+      // Fila superior
+      try {
         const topRow = ws.getRow(1);
         topRow.height = 7.5;
-        
-        // Fila inferior (encontrar la última fila con datos)
-        let lastRow = 1;
+      } catch (e) {
+        console.warn('Error setting top row height:', e);
+      }
+      
+      // Fila inferior
+      let lastRow = 1;
+      try {
         for (let i = 1; i <= 100; i++) {
           const row = ws.getRow(i);
           if (row.values && row.values.some(v => v !== null && v !== undefined && v !== '')) {
@@ -213,6 +221,8 @@
         }
         const bottomRow = ws.getRow(lastRow + 1);
         bottomRow.height = 7.5;
+      } catch (e) {
+        console.warn('Error setting bottom row height:', e);
       }
     }
 
@@ -609,15 +619,20 @@
         currentRow += 14;
       });
 
-      if (processedData.length>0){ 
-        const tcount=processedData[0].teamOrder.length; 
-        const widths=[2.25]; 
-        for(let i=0;i<tcount;i++){ 
-          widths.push(15,8,10,8,8); 
-          if(i<tcount-1) widths.push(6); 
+      if (processedData.length > 0){ 
+        const tcount = processedData[0].teamOrder.length; 
+        const widths = []; 
+        widths.push(2.25); // Padding inicial
+        for(let i = 0; i < tcount; i++){ 
+          widths.push(15, 8, 10, 8, 8); 
+          if(i < tcount - 1) widths.push(6); 
         } 
-        widths.push(2.25); // Columna padding final
-        ws.columns = widths.map(w=>({width:w})); 
+        widths.push(2.25); // Padding final
+        
+        // Configurar columnas de forma segura
+        widths.forEach((width, index) => {
+          ws.getColumn(index + 1).width = width;
+        });
       }
 
       addFraming(ws, 2.25);
@@ -711,7 +726,10 @@
           cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         });
 
-        // Anchos
+        // Anchos de columnas para cada equipo
+        const baseWidthName = NAME_W;
+        const numW = 7;
+        
         ws.getColumn(baseCol).width = baseWidthName;
         for (let off = 1; off <= 5; off++) {
           ws.getColumn(baseCol + off).width = numW;
@@ -856,20 +874,25 @@
         });
       });
 
-      ws.columns = [
-        { width: 2.25 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 3 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 3 },
-        { width: 15 }, { width: 8 }, { width: 8 }, { width: 8 },
-        { width: 2.25 }
+      // Configurar anchos de columna de forma segura
+      const columnWidths = [
+        2.25, // Padding inicial
+        15, 8, 8, 8, 3, // PUNTOS + separador
+        15, 8, 8, 8, 3, // POSTES + separador
+        15, 8, 8, 8, 3, // SCRATCHES + separador
+        15, 8, 8, 8, 3, // ACES + separador
+        3, 3, // Separador extra entre jugadores y equipos
+        15, 8, 8, 8, 3, // PUNTOS EQUIPOS + separador
+        15, 8, 8, 8, 3, // POSTES EQUIPOS + separador
+        15, 8, 8, 8, 3, // SCRATCHES EQUIPOS + separador
+        15, 8, 8, 8, 3, // ACES EQUIPOS + separador
+        15, 8, 8, 8, // ASISTENCIA EQUIPOS
+        2.25 // Padding final
       ];
+
+      columnWidths.forEach((width, index) => {
+        ws.getColumn(index + 1).width = width;
+      });
 
       addFraming(ws, 2.25);
     }

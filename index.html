@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — Liga + GP</title>
+  <title>Procesador de Logs de Trivial IRC — Liga (estanca) + GP</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <style>
@@ -80,6 +80,9 @@
   </div>
 
 <script>
+/* ==============================
+   ESTADO / UTILIDADES COMUNES
+   ============================== */
 let competitionType = 'liga';
 let processedData = [];
 let fileNames = [];
@@ -89,6 +92,7 @@ function showError(msg){ const res=document.getElementById('results'); res.inner
 function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 const widthFromPx = (px)=> +(px/7).toFixed(2);
 
+/* ===== INIT UI ===== */
 document.addEventListener('DOMContentLoaded', () => {
   const selComp = document.getElementById('competitionSelect');
   const inJ = document.getElementById('fileInputJornada');
@@ -98,12 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const bD = document.getElementById('downloadBtn');
 
   selComp.addEventListener('change', onCompetitionChange);
-  inJ.addEventListener('change', () => {
+  if (inJ) inJ.addEventListener('change', () => {
     bJ.disabled = !(inJ.files && inJ.files.length);
     fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[];
     currentProcess='jornada';
   });
-  inT.addEventListener('change', () => {
+  if (inT) inT.addEventListener('change', () => {
     bT.disabled = !(inT.files && inT.files.length) || (competitionType!=='liga');
     fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[];
     currentProcess='totales';
@@ -113,19 +117,19 @@ document.addEventListener('DOMContentLoaded', () => {
   bT.addEventListener('click', () => (competitionType==='gp' ? showError('Totales no aplica a GP') : processTotales_LIGA_V14()));
   bD.addEventListener('click', () => (competitionType==='gp' ? downloadExcel_GP() : downloadExcel_LIGA_V14()));
 
-  onCompetitionChange(); // inicializa estado
+  onCompetitionChange();
 });
 
 function onCompetitionChange(){
   competitionType = document.getElementById('competitionSelect').value;
   const gpBox = document.getElementById('gpRoundBox');
   gpBox.style.display = (competitionType==='gp') ? '' : 'none';
+
   document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga');
   document.getElementById('results').style.display='none';
   document.getElementById('downloadSection').style.display='none';
   document.getElementById('downloadBtn').disabled=true;
 }
-
 
 /* ================================================================
    ====== INICIO BLOQUE LIGA (V14 OK ESTANCO) — NO TOCAR ======
@@ -790,14 +794,13 @@ function parseLogFileSymbols_V14(content){
 
 /* ====== FIN BLOQUE LIGA (V14 OK ESTANCO) — NO TOCAR ====== */
 
-
 /* ========================= BLOQUE GP (ACTUALIZADO) ========================= */
 
 // Tabla fija de puntos por posición (1..15). 16+ → 0
 const GP_TABLE = [20,17,15,13,11,10,9,8,7,6,5,4,3,2,1];
 
+// Detecta el nombre del grupo
 function detectGroupName(lines, filename=''){
-  // Busca una línea "GRUPO X"
   for (const l of lines){
     const m = l.match(/^\s*GRUPO\s+([A-ZÑÁÉÍÓÚ])\s*$/i);
     if (m) return `GRUPO ${m[1].toUpperCase()}`;
@@ -806,7 +809,7 @@ function detectGroupName(lines, filename=''){
     const m = filename.match(/GRUPO[_\s-]?([A-ZÑ])/i);
     if (m) return `GRUPO ${m[1].toUpperCase()}`;
   }
-  return ''; // si no aparece, dejar vacío
+  return '';
 }
 
 function parseGPLog(text, filename=''){
@@ -819,28 +822,41 @@ function parseGPLog(text, filename=''){
     if (/^CLASIFICACION\s+INDIVIDUAL/i.test(L)) continue;
     if (/^GRUPO\s+/i.test(L)) continue;
 
-    // Aceptamos CUALQUIER nick, incluidos símbolos [ ] ^ etc.
-    // Formato típico:  NICK  PTS  Aces:X  Scr:Y  Palos:Z
-    const absent = /NO\s+ESTUVO\s+PRESENTE/i.test(L);
-    const m = L.match(/^(.+?)\s+(-?\d+)\s+(?:Aces:\s*(-?\d+))?\s+Scr:\s*(-?\d+)\s+Palos:\s*(-?\d+)/i);
-    if (m){
-      const name = (m[1]||'').trim();
+    // A) AUSENTE: "NICK .... NO ESTUVO PRESENTE"
+    const absentMatch = L.match(/^(.+?)\s+NO\s+ESTUVO\s+PRESENTE$/i);
+    if (absentMatch){
+      const name = absentMatch[1].trim();
       if (!name) continue;
       players.push({
-        name: name.toUpperCase(),     // mantenemos símbolos tal cual, solo mayúsculas
-        pts:  absent ? 0 : parseInt(m[2]||'0',10),
-        ace:  absent ? 0 : parseInt(m[3]||'0',10),
-        scr:  absent ? 0 : parseInt(m[4]||'0',10),
-        pal:  absent ? 0 : parseInt(m[5]||'0',10), // POSTES (palos)
-        present: !absent,
-        pos: 0,
-        gpp: 0
+        name: name.toUpperCase(),  // respetamos símbolos como [ ] ^ etc.
+        pts: 0, pal: 0, scr: 0, ace: 0,
+        present: false,
+        pos: 0, gpp: 0
       });
       continue;
     }
+
+    // B) PRESENTE: "NICK  PTS  Aces:X  Scr:Y  Palos:Z"
+    const presentMatch = L.match(/^(.+?)\s+(-?\d+)\s+(?:Aces:\s*(-?\d+))?\s+Scr:\s*(-?\d+)\s+Palos:\s*(-?\d+)$/i);
+    if (presentMatch){
+      const name = presentMatch[1].trim();
+      if (!name) continue;
+      players.push({
+        name: name.toUpperCase(),
+        pts: parseInt(presentMatch[2]||'0',10),
+        ace: parseInt(presentMatch[3]||'0',10),
+        scr: parseInt(presentMatch[4]||'0',10),
+        pal: parseInt(presentMatch[5]||'0',10), // POSTES (palos)
+        present: true,
+        pos: 0, gpp: 0
+      });
+      continue;
+    }
+
+    // C) Formatos raros: ignoramos (no romper)
   }
 
-  // Calcular posiciones (solo presentes), por PTS desc, luego SCR desc, luego ACE desc
+  // Calcular posiciones y GPP SOLO con presentes
   const present = players.filter(p=>p.present).sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
   for (let i=0, pos=1; i<present.length; ){
     let j=i+1;
@@ -866,14 +882,15 @@ function parseGPLog(text, filename=''){
     i = j;
   }
 
-  // Asignar a array completo (los ausentes quedan con gpp=0)
+  // Mapear de vuelta (ausentes mantienen gpp=0)
   const map = Object.fromEntries(present.map(p=>[p.name,p]));
   players.forEach(p=>{
     if (p.present){ const q = map[p.name]; p.pos = q.pos; p.gpp = q.gpp; }
   });
 
-  // Orden final por PTS desc / SCR desc / ACE desc (ausentes al final si todos 0)
-  players.sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
+  // Orden final (presentes arriba, ausentes con todo 0 abajo)
+  players.sort((a,b)=> (b.present - a.present) || (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
+
   return { group: groupName, players };
 }
 
@@ -890,7 +907,6 @@ function processJornada_GP(){
       processedData[index] = group;
       processed++;
       if (processed === files.length){
-        // Orden alfabético por grupo
         processedData = processedData.filter(Boolean).sort((a,b)=> String(a.group||'').localeCompare(String(b.group||''),'es',{sensitivity:'base'}));
         const res = document.getElementById('results');
         res.innerHTML = `<div class="success">GP: ${files.length} archivo(s) analizado(s). Pulsa “Descargar Excel”.</div>`;
@@ -904,15 +920,14 @@ function processJornada_GP(){
 }
 
 function buildGPSheet(ws, groups){
-  // Parámetros y anchos
   const leftMarginCols = 1, rightMarginCols = 1, betweenGroupsCols = 4;
   const marginW = widthFromPx(24);
   const nameW   = widthFromPx(150);
   const numW    = widthFromPx(40);
-  const bandARGB = 'FF0B7D7D';   // cabecera
+  const bandARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
 
-  // GPx elegido
+  // GPx
   const gpRound = Math.min(Math.max(parseInt(document.getElementById('gpRoundSelect')?.value || '1',10),1),5);
   const GPP_LABEL = `GP${gpRound}`;
 
@@ -922,20 +937,20 @@ function buildGPSheet(ws, groups){
   ws.spliceRows(1, 0, []);
   try { ws.getRow(1).height = 7.5; } catch {}
 
-  // Definir columnas totales
+  // Columnas totales
   const totalCols = leftMarginCols + (groups.length * 6) + ((groups.length - 1) * betweenGroupsCols) + rightMarginCols;
   ws.columns = Array.from({length: totalCols}, ()=>({ width: 11 }));
 
   // Márgenes laterales
-  ws.getColumn(1).width = marginW;                                       // izq
-  ws.getColumn(totalCols).width = marginW;                               // dcha
+  ws.getColumn(1).width = marginW;
+  ws.getColumn(totalCols).width = marginW;
 
   const headerRow = 2;
   const dataStartRow = headerRow + 1;
   let baseCol = leftMarginCols + 1;
 
   groups.forEach((g, idx)=>{
-    // Cabecera coloreada (bordes solo aquí)
+    // Cabecera coloreada
     const headers = [ (g.group || ''), GPP_LABEL, 'PTS', 'POS', 'SCR', 'ACE' ];
     for (let off=0; off<6; off++){
       const c = ws.getCell(headerRow, baseCol+off);
@@ -946,11 +961,11 @@ function buildGPSheet(ws, groups){
       c.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     }
 
-    // Anchos de bloque
+    // Anchos
     ws.getColumn(baseCol).width = nameW;
     for (let off=1; off<=5; off++) ws.getColumn(baseCol+off).width = numW;
 
-    // Datos (sin bordes). POS = POSTES (palos). 0→blanco salvo GPX.
+    // Datos (sin bordes); 0→blanco salvo GPX
     let r = dataStartRow;
     const blankIfZero = (v)=> (v === 0 ? '' : v);
     (g.players || []).forEach(p=>{
@@ -958,9 +973,9 @@ function buildGPSheet(ws, groups){
       ws.getCell(r, baseCol).alignment = { horizontal:'left', vertical:'middle' };
 
       const gpxCell = ws.getCell(r, baseCol+1);
-      gpxCell.value = (p.gpp ?? 0);                         // mantener 0 visible
+      gpxCell.value = (p.gpp ?? 0);                  // mantener 0 visible
       gpxCell.alignment = { horizontal:'center', vertical:'middle' };
-      gpxCell.font = { bold: true };                        // GPX en negrita
+      gpxCell.font = { bold: true };                 // GPX en negrita
 
       ws.getCell(r, baseCol+2).value = blankIfZero(p.pts ?? 0); // PTS
       ws.getCell(r, baseCol+2).alignment = { horizontal:'center', vertical:'middle' };
@@ -988,7 +1003,6 @@ function buildGPSheet(ws, groups){
     }
   });
 
-  // Ajustes de impresión
   try {
     ws.pageSetup = {
       orientation: 'landscape',

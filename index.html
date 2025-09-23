@@ -799,17 +799,18 @@ function parseLogFileSymbols_V14(content){
 // Tabla fija de puntos por posición (1..15). 16+ → 0
 const GP_TABLE = [20,17,15,13,11,10,9,8,7,6,5,4,3,2,1];
 
-// Detecta el nombre del grupo
+// Detecta el nombre del grupo en cualquier parte del archivo.
+// Si no existe, devolver "GRUPO ?"
 function detectGroupName(lines, filename=''){
   for (const l of lines){
-    const m = l.match(/^\s*GRUPO\s+([A-ZÑÁÉÍÓÚ])\s*$/i);
+    const m = l.match(/\bGRUPO\s+([A-ZÑÁÉÍÓÚ])\b/i);
     if (m) return `GRUPO ${m[1].toUpperCase()}`;
   }
   if (filename){
     const m = filename.match(/GRUPO[_\s-]?([A-ZÑ])/i);
     if (m) return `GRUPO ${m[1].toUpperCase()}`;
   }
-  return '';
+  return 'GRUPO ?';
 }
 
 function parseGPLog(text, filename=''){
@@ -822,38 +823,30 @@ function parseGPLog(text, filename=''){
     if (/^CLASIFICACION\s+INDIVIDUAL/i.test(L)) continue;
     if (/^GRUPO\s+/i.test(L)) continue;
 
-    // A) AUSENTE: "NICK .... NO ESTUVO PRESENTE"
+    // AUSENTE: "NICK .... NO ESTUVO PRESENTE"
     const absentMatch = L.match(/^(.+?)\s+NO\s+ESTUVO\s+PRESENTE$/i);
     if (absentMatch){
-      const name = absentMatch[1].trim();
-      if (!name) continue;
+      const name = absentMatch[1].trim(); if (!name) continue;
       players.push({
-        name: name.toUpperCase(),  // respetamos símbolos como [ ] ^ etc.
-        pts: 0, pal: 0, scr: 0, ace: 0,
-        present: false,
-        pos: 0, gpp: 0
+        name: name.toUpperCase(), pts: 0, pal: 0, scr: 0, ace: 0,
+        present: false, pos: 0, gpp: 0
       });
       continue;
     }
 
-    // B) PRESENTE: "NICK  PTS  Aces:X  Scr:Y  Palos:Z"
+    // PRESENTE: "NICK  PTS  Aces:X  Scr:Y  Palos:Z"
     const presentMatch = L.match(/^(.+?)\s+(-?\d+)\s+(?:Aces:\s*(-?\d+))?\s+Scr:\s*(-?\d+)\s+Palos:\s*(-?\d+)$/i);
     if (presentMatch){
-      const name = presentMatch[1].trim();
-      if (!name) continue;
+      const name = presentMatch[1].trim(); if (!name) continue;
       players.push({
         name: name.toUpperCase(),
-        pts: parseInt(presentMatch[2]||'0',10),
-        ace: parseInt(presentMatch[3]||'0',10),
-        scr: parseInt(presentMatch[4]||'0',10),
-        pal: parseInt(presentMatch[5]||'0',10), // POSTES (palos)
-        present: true,
-        pos: 0, gpp: 0
+        pts: Number(presentMatch[2]||0),
+        ace: Number(presentMatch[3]||0),
+        scr: Number(presentMatch[4]||0),
+        pal: Number(presentMatch[5]||0), // POSTES (palos)
+        present: true, pos: 0, gpp: 0
       });
-      continue;
     }
-
-    // C) Formatos raros: ignoramos (no romper)
   }
 
   // Calcular posiciones y GPP SOLO con presentes
@@ -868,27 +861,21 @@ function parseGPLog(text, filename=''){
     pos += (j-i); i = j;
   }
 
-  // GPP por media de posiciones empatadas
   for (let i=0; i<present.length; ){
     const startPos = present[i].pos;
     let j=i+1; while (j<present.length && present[j].pos===startPos) j++;
     const endPos = startPos + (j-i) - 1;
     const vals = [];
-    for (let r=startPos; r<=endPos; r++){
-      const idx = r-1; vals.push(idx<GP_TABLE.length ? GP_TABLE[idx] : 0);
-    }
+    for (let r=startPos; r<=endPos; r++){ const idx=r-1; vals.push(idx<GP_TABLE.length ? GP_TABLE[idx] : 0); }
     const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
     for (let k=i;k<j;k++) present[k].gpp = +avg.toFixed(2);
     i = j;
   }
 
-  // Mapear de vuelta (ausentes mantienen gpp=0)
   const map = Object.fromEntries(present.map(p=>[p.name,p]));
-  players.forEach(p=>{
-    if (p.present){ const q = map[p.name]; p.pos = q.pos; p.gpp = q.gpp; }
-  });
+  players.forEach(p=>{ if (p.present){ const q = map[p.name]; p.pos = q.pos; p.gpp = q.gpp; } });
 
-  // Orden final (presentes arriba, ausentes con todo 0 abajo)
+  // Orden final: presentes arriba, ausentes abajo
   players.sort((a,b)=> (b.present - a.present) || (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
 
   return { group: groupName, players };
@@ -919,6 +906,7 @@ function processJornada_GP(){
   });
 }
 
+// Construcción de la hoja GP
 function buildGPSheet(ws, groups){
   const leftMarginCols = 1, rightMarginCols = 1, betweenGroupsCols = 4;
   const marginW = widthFromPx(24);
@@ -927,7 +915,6 @@ function buildGPSheet(ws, groups){
   const bandARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
 
-  // GPx
   const gpRound = Math.min(Math.max(parseInt(document.getElementById('gpRoundSelect')?.value || '1',10),1),5);
   const GPP_LABEL = `GP${gpRound}`;
 
@@ -950,11 +937,12 @@ function buildGPSheet(ws, groups){
   let baseCol = leftMarginCols + 1;
 
   groups.forEach((g, idx)=>{
-    // Cabecera coloreada
-    const headers = [ (g.group || ''), GPP_LABEL, 'PTS', 'POS', 'SCR', 'ACE' ];
+    // Cabecera coloreada (primera celda = nombre del grupo SIEMPRE)
+    const groupTitle = g.group && g.group.trim() ? g.group : 'GRUPO ?';
+    const headers = [ groupTitle, GPP_LABEL, 'PTS', 'POS', 'SCR', 'ACE' ];
     for (let off=0; off<6; off++){
       const c = ws.getCell(headerRow, baseCol+off);
-      c.value = headers[off] || '';
+      c.value = headers[off];
       c.font = { bold:true, color:{argb:whiteARGB} };
       c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bandARGB} };
       c.alignment = { horizontal: off===0 ? 'left' : 'center', vertical:'middle' };
@@ -965,29 +953,31 @@ function buildGPSheet(ws, groups){
     ws.getColumn(baseCol).width = nameW;
     for (let off=1; off<=5; off++) ws.getColumn(baseCol+off).width = numW;
 
-    // Datos (sin bordes); 0→blanco salvo GPX
+    // Datos (sin bordes)
     let r = dataStartRow;
-    const blankIfZero = (v)=> (v === 0 ? '' : v);
     (g.players || []).forEach(p=>{
-      ws.getCell(r, baseCol).value = p.name || '';
-      ws.getCell(r, baseCol).alignment = { horizontal:'left', vertical:'middle' };
+      // Nombre
+      const cN = ws.getCell(r, baseCol);
+      cN.value = p.name || '';
+      cN.alignment = { horizontal:'left', vertical:'middle' };
 
-      const gpxCell = ws.getCell(r, baseCol+1);
-      gpxCell.value = (p.gpp ?? 0);                  // mantener 0 visible
-      gpxCell.alignment = { horizontal:'center', vertical:'middle' };
-      gpxCell.font = { bold: true };                 // GPX en negrita
+      // GPX (en negrita; si ausente → 0 visible)
+      const cG = ws.getCell(r, baseCol+1);
+      cG.value = (p.gpp ?? 0);
+      cG.alignment = { horizontal:'center', vertical:'middle' };
+      cG.font = { bold: true };
 
-      ws.getCell(r, baseCol+2).value = blankIfZero(p.pts ?? 0); // PTS
-      ws.getCell(r, baseCol+2).alignment = { horizontal:'center', vertical:'middle' };
+      // El resto: si AUSENTE → celda VACÍA (no "0")
+      const setBlankOrNumber = (cell, value) => {
+        if (!p.present) { cell.value = ''; }
+        else { cell.value = (value === 0 ? '' : value); }
+        cell.alignment = { horizontal:'center', vertical:'middle' };
+      };
 
-      ws.getCell(r, baseCol+3).value = blankIfZero(p.pal ?? 0); // POS = POSTES
-      ws.getCell(r, baseCol+3).alignment = { horizontal:'center', vertical:'middle' };
-
-      ws.getCell(r, baseCol+4).value = blankIfZero(p.scr ?? 0); // SCR
-      ws.getCell(r, baseCol+4).alignment = { horizontal:'center', vertical:'middle' };
-
-      ws.getCell(r, baseCol+5).value = blankIfZero(p.ace ?? 0); // ACE
-      ws.getCell(r, baseCol+5).alignment = { horizontal:'center', vertical:'middle' };
+      setBlankOrNumber(ws.getCell(r, baseCol+2), Number(p.pts||0)); // PTS
+      setBlankOrNumber(ws.getCell(r, baseCol+3), Number(p.pal||0)); // POS = POSTES
+      setBlankOrNumber(ws.getCell(r, baseCol+4), Number(p.scr||0)); // SCR
+      setBlankOrNumber(ws.getCell(r, baseCol+5), Number(p.ace||0)); // ACE
 
       r++;
     });
@@ -1012,11 +1002,12 @@ function buildGPSheet(ws, groups){
   } catch {}
 }
 
+function processTotales_LIGA_V14(){ showError('Totales solo aplica a Liga.'); } // placeholder por si pulsaran en GP
+
 async function downloadExcel_GP(){
   if (!processedData || processedData.length === 0) return showError('No hay datos procesados.');
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
-
   const ws = wb.addWorksheet('GP', { views:[{ state:'normal', showGridLines:false }] });
   buildGPSheet(ws, processedData);
 
@@ -1025,6 +1016,10 @@ async function downloadExcel_GP(){
   saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_${stamp}.xlsx`);
   showSuccess('Excel GP generado correctamente.');
 }
+
+/* ========= DISPATCHERS A LIGA (pega tu bloque V14 aquí) ========= */
+function processJornada_LIGA_V14(){ /* pega aquí tu BLOQUE LIGA V14 (estanco) */ }
+function downloadExcel_LIGA_V14(){ /* pega aquí tu BLOQUE LIGA V14 (estanco) */ }
 </script>
 </body>
 </html>

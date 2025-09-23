@@ -122,7 +122,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Botones
   bJ.addEventListener('click', () => (competitionType==='gp' ? processJornada_GP() : processJornada_LIGA()));
   bT.addEventListener('click', () => (competitionType==='gp' ? processTotales_GP() : processTotales_LIGA()));
-  bD.addEventListener('click', () => (competitionType==='gp' ? downloadExcel_GP() : downloadExcel_LIGA()));
+  bD.addEventListener('click', () => {
+    if (competitionType === 'gp') {
+      if (currentProcess === 'totales') {
+        downloadExcel_GP_Totales();
+      } else {
+        downloadExcel_GP();
+      }
+    } else {
+      downloadExcel_LIGA();
+    }
+  });
 
   // Estado inicial
   onCompetitionChange();
@@ -1006,6 +1016,284 @@ async function downloadExcel_GP(){
   const stamp = new Date().toISOString().slice(0,10);
   saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_${stamp}.xlsx`);
   showSuccess('Excel GP generado correctamente.');
+}
+
+// PROCESO 2 GP: Totales GP
+async function processTotales_GP(){
+  if (competitionType!=='gp') return;
+  const files = document.getElementById('fileInputTotales').files;
+  if (!files || files.length === 0) return showError('Selecciona al menos un archivo Excel GP (.xlsx)');
+  
+  try{
+    const gpData = []; // Array para almacenar datos de cada jornada GP
+    fileNames = Array.from(files).map(f=>f.name);
+    
+    for (const file of files){
+      const buffer = await file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      
+      const worksheet = workbook.getWorksheet('GP');
+      if (!worksheet){ 
+        showError(`El archivo ${file.name} no tiene hoja 'GP'`); 
+        return; 
+      }
+      
+      const jordadaData = extractGPDataFromExcel(worksheet);
+      if (jordadaData) gpData.push(jordadaData);
+    }
+    
+    if (gpData.length === 0){
+      showError("No se encontraron datos válidos en los archivos GP.");
+      return;
+    }
+    
+    // Procesar datos para totales
+    processedData = calculateGPTotals(gpData);
+    
+    displayTotalesGPResults();
+    document.getElementById('downloadSection').style.display='block';
+    document.getElementById('downloadBtn').disabled = false;
+    currentProcess='totales';
+    
+    showSuccess(`${fileNames.length} archivo${fileNames.length>1?'s':''} GP procesado${fileNames.length>1?'s':''} correctamente`);
+    
+  }catch(err){ 
+    showError(`Error al procesar totales GP: ${err.message}`); 
+    console.error(err);
+  }
+}
+
+// Extraer datos de un Excel GP
+function extractGPDataFromExcel(worksheet){
+  const groups = [];
+  const maxRows = worksheet.rowCount || 100;
+  
+  // Buscar grupos en el Excel
+  for (let row = 1; row <= maxRows; row++){
+    const cellValue = worksheet.getCell(row, 1).value;
+    if (cellValue && String(cellValue).match(/GRUPO\s+[A-Z]/i)){
+      const groupName = String(cellValue).trim();
+      const players = [];
+      
+      // Leer jugadores de este grupo (máximo 20 filas hacia abajo)
+      for (let playerRow = row + 1; playerRow <= row + 20; playerRow++){
+        const name = worksheet.getCell(playerRow, 1).value;
+        const gpp = worksheet.getCell(playerRow, 2).value;
+        
+        if (!name) break; // No más jugadores
+        
+        players.push({
+          name: String(name).trim().toUpperCase(),
+          gpp: Number(gpp) || 0
+        });
+      }
+      
+      if (players.length > 0){
+        groups.push({ group: groupName, players });
+      }
+    }
+  }
+  
+  return groups.length > 0 ? groups : null;
+}
+
+// Calcular totales GP (GLOBAL, DESC, TOTAL)
+function calculateGPTotals(allJornadas){
+  const playerStats = {}; // {playerName: {group, jornadas: [gpp1, gpp2, ...], global, desc, total}}
+  
+  // Recopilar todos los datos por jugador
+  allJornadas.forEach((jornada, jornadaIndex) => {
+    jornada.forEach(group => {
+      group.players.forEach(player => {
+        if (!playerStats[player.name]){
+          playerStats[player.name] = {
+            group: group.group,
+            jornadas: [],
+            global: 0,
+            desc: 0,
+            total: 0
+          };
+        }
+        
+        // Asegurar que el array tiene el tamaño correcto
+        while (playerStats[player.name].jornadas.length <= jornadaIndex){
+          playerStats[player.name].jornadas.push(0);
+        }
+        
+        playerStats[player.name].jornadas[jornadaIndex] = player.gpp;
+      });
+    });
+  });
+  
+  // Calcular GLOBAL, DESC y TOTAL para cada jugador
+  Object.keys(playerStats).forEach(playerName => {
+    const player = playerStats[playerName];
+    const gppValues = player.jornadas;
+    
+    // GLOBAL = suma de todos los GPP
+    player.global = gppValues.reduce((sum, gpp) => sum + gpp, 0);
+    
+    // DESC = menor valor GPP
+    player.desc = Math.min(...gppValues);
+    
+    // TOTAL = GLOBAL - DESC
+    player.total = player.global - player.desc;
+  });
+  
+  // Organizar por grupos
+  const groupedResults = {};
+  Object.keys(playerStats).forEach(playerName => {
+    const player = playerStats[playerName];
+    if (!groupedResults[player.group]){
+      groupedResults[player.group] = [];
+    }
+    
+    groupedResults[player.group].push({
+      name: playerName,
+      group: player.group,
+      jornadas: player.jornadas,
+      global: player.global,
+      desc: player.desc,
+      total: player.total
+    });
+  });
+  
+  // Ordenar cada grupo (por GLOBAL si < 5 jornadas, por TOTAL si >= 5 jornadas)
+  const numJornadas = allJornadas.length;
+  const sortKey = numJornadas >= 5 ? 'total' : 'global';
+  
+  Object.keys(groupedResults).forEach(groupName => {
+    groupedResults[groupName].sort((a, b) => b[sortKey] - a[sortKey]);
+  });
+  
+  return { groups: groupedResults, numJornadas };
+}
+
+// Mostrar resultados de totales GP
+function displayTotalesGPResults(){
+  const resultsDiv = document.getElementById('results'); 
+  resultsDiv.innerHTML='';
+  
+  const totalPlayers = Object.values(processedData.groups).reduce((sum, group) => sum + group.length, 0);
+  
+  const info = document.createElement('div'); 
+  info.className='log-info';
+  info.innerHTML = `<h3>🏆 Totales GP Procesados</h3>
+    <p><strong>Jornadas procesadas:</strong> ${processedData.numJornadas}</p>
+    <p><strong>Grupos:</strong> ${Object.keys(processedData.groups).length}</p>
+    <p><strong>Jugadores totales:</strong> ${totalPlayers}</p>
+    <p><em>Ordenado por: ${processedData.numJornadas >= 5 ? 'TOTAL (mejores 4 de 5)' : 'GLOBAL (suma total)'}</em></p>
+    <p><em>Pulsa "Descargar Excel" para generar el archivo</em></p>`;
+  resultsDiv.appendChild(info); 
+  resultsDiv.style.display='block';
+}
+
+// Descargar Excel de totales GP
+async function downloadExcel_GP_Totales(){
+  if (!processedData || !processedData.groups) return showError('No hay datos de totales GP procesados.');
+  
+  const wb = new ExcelJS.Workbook();
+  wb.created = new Date();
+  
+  const ws = wb.addWorksheet('Totales GP', { views:[{ state:'normal', showGridLines:false }] });
+  buildGPTotalsSheet(ws, processedData);
+  
+  const uint8 = await wb.xlsx.writeBuffer();
+  const stamp = new Date().toISOString().slice(0,10);
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_Totales_${stamp}.xlsx`);
+  showSuccess('Excel Totales GP generado correctamente.');
+}
+
+// Construir hoja de totales GP
+function buildGPTotalsSheet(ws, data){
+  const marginW = widthFromPx(24);
+  const nameW = widthFromPx(150);
+  const numW = widthFromPx(50);
+  const bandARGB = 'FF0B7D7D';
+  const whiteARGB = 'FFFFFFFF';
+  
+  ws.views = [{ state: 'normal', showGridLines: false }];
+  
+  // Fila vacía arriba
+  ws.spliceRows(1, 0, []);
+  try { ws.getRow(1).height = 7.5; } catch {}
+  
+  const groups = Object.keys(data.groups).sort();
+  const numJornadas = data.numJornadas;
+  
+  // Calcular columnas necesarias: margen + TOTAL + GLOBAL + DESC + nombre + GP1-GP5 + margen
+  const totalCols = 1 + 3 + 1 + 5 + 1;
+  ws.columns = Array.from({length: totalCols}, () => ({ width: 11 }));
+  
+  // Configurar anchos
+  ws.getColumn(1).width = marginW;    // margen izq
+  ws.getColumn(2).width = numW;       // TOTAL
+  ws.getColumn(3).width = numW;       // GLOBAL  
+  ws.getColumn(4).width = numW;       // DESC
+  ws.getColumn(5).width = nameW;      // nombre
+  // GP1-GP5 mantienen ancho por defecto
+  ws.getColumn(totalCols).width = marginW; // margen der
+  
+  let currentRow = 2;
+  
+  groups.forEach((groupName, groupIndex) => {
+    const players = data.groups[groupName];
+    
+    // Cabecera del grupo
+    const headers = ['TOTAL', 'GLOBAL', 'DESC', groupName, 'GP1', 'GP2', 'GP3', 'GP4', 'GP5'];
+    for (let col = 0; col < headers.length; col++){
+      const cell = ws.getCell(currentRow, col + 2);
+      cell.value = headers[col];
+      cell.font = { bold: true, color: { argb: whiteARGB } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bandARGB } };
+      cell.alignment = { horizontal: col === 3 ? 'left' : 'center', vertical: 'middle' };
+      cell.border = { 
+        top: {style: 'thin'}, left: {style: 'thin'}, 
+        bottom: {style: 'thin'}, right: {style: 'thin'} 
+      };
+    }
+    
+    currentRow++;
+    
+    // Datos de jugadores
+    players.forEach(player => {
+      // TOTAL
+      ws.getCell(currentRow, 2).value = player.total;
+      ws.getCell(currentRow, 2).alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // GLOBAL  
+      ws.getCell(currentRow, 3).value = player.global;
+      ws.getCell(currentRow, 3).alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // DESC
+      ws.getCell(currentRow, 4).value = player.desc;
+      ws.getCell(currentRow, 4).alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // Nombre
+      ws.getCell(currentRow, 5).value = player.name;
+      ws.getCell(currentRow, 5).alignment = { horizontal: 'left', vertical: 'middle' };
+      
+      // GP1-GP5
+      for (let i = 0; i < 5; i++){
+        const gppValue = i < player.jornadas.length ? player.jornadas[i] : 0;
+        if (gppValue > 0){
+          ws.getCell(currentRow, 6 + i).value = gppValue;
+        }
+        ws.getCell(currentRow, 6 + i).alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+      
+      currentRow++;
+    });
+    
+    // Espacio entre grupos (excepto el último)
+    if (groupIndex < groups.length - 1){
+      currentRow += 2;
+    }
+  });
+  
+  // Fila vacía abajo
+  ws.addRow([]);
 }
 
 /* ===================== FIN BLOQUE GP ===================== */

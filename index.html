@@ -64,13 +64,13 @@
       <button class="button" id="processJornadaBtn" disabled>Procesar Jornada</button>
     </div>
 
-    <!-- PROCESO 2: Totales y Medias Liga -->
+    <!-- PROCESO 2: Totales y Medias -->
     <div class="upload-section" style="border-color: #28a745; background-color: #f8fff9;">
-      <h3>🏆 Totales y Medias Liga</h3>
-      <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados</p>
+      <h3 id="totalesTitle">🏆 Totales y Medias Liga</h3>
+      <p id="totalesDescription">Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados</p>
       <input type="file" id="fileInputTotales" accept=".xlsx" multiple />
       <br />
-      <button class="button" id="processTotalesBtn" disabled style="background-color: #28a745;">Generar Totales Liga</button>
+      <button class="button" id="processTotalesBtn" disabled style="background-color: #28a745;" id="totalesButton">Generar Totales Liga</button>
     </div>
 
     <div id="results" class="results" style="display: none;"></div>
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Botones
   bJ.addEventListener('click', () => (competitionType==='gp' ? processJornada_GP() : processJornada_LIGA()));
-  bT.addEventListener('click', () => processTotales_LIGA()); // Totales solo en Liga; el botón ya se deshabilita en GP
+  bT.addEventListener('click', () => (competitionType==='gp' ? processTotales_GP() : processTotales_LIGA()));
   bD.addEventListener('click', () => (competitionType==='gp' ? downloadExcel_GP() : downloadExcel_LIGA()));
 
   // Estado inicial
@@ -133,14 +133,29 @@ function onCompetitionChange(){
   const gpBox = document.getElementById('gpRoundBox');
   gpBox.style.display = (competitionType==='gp') ? 'inline-block' : 'none';
 
+  // Cambiar textos según el tipo de competición
+  const title = document.getElementById('totalesTitle');
+  const desc = document.getElementById('totalesDescription');
+  const btn = document.getElementById('processTotalesBtn');
+  
+  if (competitionType === 'gp') {
+    title.textContent = '🏆 Totales GP';
+    desc.textContent = 'Sube los Excels (.xlsx) de GP generados de cada jornada para obtener totales acumulados';
+    btn.textContent = 'Generar Totales GP';
+  } else {
+    title.textContent = '🏆 Totales y Medias Liga';
+    desc.textContent = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
+    btn.textContent = 'Generar Totales Liga';
+  }
+
   // Reset UI de descarga al cambiar modo
   document.getElementById('results').style.display = 'none';
   document.getElementById('downloadSection').style.display = 'none';
   document.getElementById('downloadBtn').disabled = true;
 
-  // Botón Totales solo útil en Liga
+  // Botón Totales habilitado tanto en Liga como GP
   const inT = document.getElementById('fileInputTotales');
-  document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga') || !(inT.files && inT.files.length);
+  document.getElementById('processTotalesBtn').disabled = !(inT.files && inT.files.length);
 }
 
 /* ================================================================

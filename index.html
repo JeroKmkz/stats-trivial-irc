@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — GP actualizado (Liga estanca aparte)</title>
+  <title>Procesador de Logs de Trivial IRC — Liga + GP</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <style>
@@ -41,8 +41,8 @@
         <option value="posiciones" disabled>Torneo Posiciones (próx.)</option>
       </select>
 
-      <!-- Selector de jornada GP (visible solo en GP) -->
-      <span id="gpRoundBox">
+      <!-- Selector de jornada GP -->
+      <span id="gpRoundBox" style="display:none;">
         <label for="gpRoundSelect">Jornada GP:</label>
         <select id="gpRoundSelect">
           <option value="1" selected>GP1</option>
@@ -80,19 +80,15 @@
   </div>
 
 <script>
-/* ========== ESTADO / UTILIDADES ========= */
-let competitionType = 'liga';     // 'liga' | 'gp'
+let competitionType = 'liga';
 let processedData = [];
 let fileNames = [];
-let currentProcess = '';          // 'jornada' | 'totales'
+let currentProcess = '';
 
 function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
 function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
+const widthFromPx = (px)=> +(px/7).toFixed(2);
 
-const PX_PER_CHAR = 7;
-const widthFromPx = (px) => +(px / PX_PER_CHAR).toFixed(2);
-
-/* ========== INIT UI ========= */
 document.addEventListener('DOMContentLoaded', () => {
   const selComp = document.getElementById('competitionSelect');
   const inJ = document.getElementById('fileInputJornada');
@@ -101,43 +97,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const bT = document.getElementById('processTotalesBtn');
   const bD = document.getElementById('downloadBtn');
 
-  // Listeners
   selComp.addEventListener('change', onCompetitionChange);
-  if (inJ) inJ.addEventListener('change', () => {
+  inJ.addEventListener('change', () => {
     bJ.disabled = !(inJ.files && inJ.files.length);
     fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[];
     currentProcess='jornada';
   });
-  if (inT) inT.addEventListener('change', () => {
+  inT.addEventListener('change', () => {
     bT.disabled = !(inT.files && inT.files.length) || (competitionType!=='liga');
     fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[];
     currentProcess='totales';
   });
 
-  // Dispatchers
   bJ.addEventListener('click', () => (competitionType==='gp' ? processJornada_GP() : processJornada_LIGA_V14()));
   bT.addEventListener('click', () => (competitionType==='gp' ? showError('Totales no aplica a GP') : processTotales_LIGA_V14()));
   bD.addEventListener('click', () => (competitionType==='gp' ? downloadExcel_GP() : downloadExcel_LIGA_V14()));
 
-  // Fuerza estado inicial y visibilidad del selector GP
-  onCompetitionChange();
+  onCompetitionChange(); // inicializa estado
 });
 
 function onCompetitionChange(){
-  const sel = document.getElementById('competitionSelect');
-  competitionType = sel.value;
+  competitionType = document.getElementById('competitionSelect').value;
   const gpBox = document.getElementById('gpRoundBox');
   gpBox.style.display = (competitionType==='gp') ? '' : 'none';
-
-  // Totales solo en liga
-  const inT = document.getElementById('fileInputTotales');
-  document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga') || !(inT.files && inT.files.length);
-
-  // Reset descarga
-  document.getElementById('results').style.display = 'none';
-  document.getElementById('downloadSection').style.display = 'none';
-  document.getElementById('downloadBtn').disabled = true;
+  document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga');
+  document.getElementById('results').style.display='none';
+  document.getElementById('downloadSection').style.display='none';
+  document.getElementById('downloadBtn').disabled=true;
 }
+
 
 /* ================================================================
    ====== INICIO BLOQUE LIGA (V14 OK ESTANCO) — NO TOCAR ======

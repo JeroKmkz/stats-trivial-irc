@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — V15 (Liga blindada + GP corregido)</title>
+  <title>Procesador de Logs de Trivial IRC — GP actualizado (Liga estanca aparte)</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <style>
@@ -23,7 +23,6 @@
     .competition-select { text-align: center; margin-bottom: 30px; display:flex; gap:12px; justify-content:center; align-items:center; flex-wrap:wrap; }
     .competition-select label { font-weight: bold; margin-right: 6px; }
     select { padding: 6px 10px; font-size: 14px; }
-    #gpRoundBox { display:none; }
   </style>
 </head>
 <body>
@@ -33,7 +32,7 @@
     <!-- SELECCIÓN DE COMPETICIÓN -->
     <div class="competition-select">
       <label for="competitionSelect">Tipo de competición:</label>
-      <select id="competitionSelect" onchange="onCompetitionChange()">
+      <select id="competitionSelect">
         <option value="liga" selected>Liga</option>
         <option value="gp">GP</option>
         <option value="copa" disabled>Copa (próx.)</option>
@@ -59,74 +58,85 @@
     <div class="upload-section">
       <h3>📊 Estadísticas de la Jornada</h3>
       <p>Sube los logs (.txt) de las partidas de una jornada específica</p>
-      <input type="file" id="fileInputJornada" accept=".txt" multiple onchange="onFilesJornadaChange()" />
+      <input type="file" id="fileInputJornada" accept=".txt" multiple />
       <br />
-      <!-- Dispatcher: redirige a Liga (V14) o GP -->
-      <button class="button" onclick="processJornada_DISPATCH()" id="processJornadaBtn" disabled>Procesar Jornada</button>
+      <button class="button" id="processJornadaBtn" disabled>Procesar Jornada</button>
     </div>
 
     <!-- PROCESO 2: Totales y Medias Liga -->
     <div class="upload-section" style="border-color: #28a745; background-color: #f8fff9;">
       <h3>🏆 Totales y Medias Liga</h3>
       <p>Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados</p>
-      <input type="file" id="fileInputTotales" accept=".xlsx" multiple onchange="onFilesTotalesChange()" />
+      <input type="file" id="fileInputTotales" accept=".xlsx" multiple />
       <br />
-      <!-- Dispatcher: redirige a Liga (V14) -->
-      <button class="button" onclick="processTotales_DISPATCH()" id="processTotalesBtn" disabled style="background-color: #28a745;">Generar Totales Liga</button>
+      <button class="button" id="processTotalesBtn" disabled style="background-color: #28a745;">Generar Totales Liga</button>
     </div>
 
     <div id="results" class="results" style="display: none;"></div>
 
     <div id="downloadSection" style="display: none; text-align: center; margin-top: 30px;">
-      <!-- Dispatcher: redirige a Liga (V14) o GP -->
-      <button class="button" onclick="downloadExcel_DISPATCH()" id="downloadBtn" disabled>📥 Descargar Excel</button>
+      <button class="button" id="downloadBtn" disabled>📥 Descargar Excel</button>
     </div>
   </div>
 
 <script>
-/* ==============================
-   ESTADO Y UTILIDADES COMUNES
-   ============================== */
+/* ========== ESTADO / UTILIDADES ========= */
 let competitionType = 'liga';     // 'liga' | 'gp'
-let processedData = [];           // compartido por ambos modos
+let processedData = [];
 let fileNames = [];
 let currentProcess = '';          // 'jornada' | 'totales'
 
-// Mensajes UI
 function showError(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="error">${msg}</div>`; res.style.display='block'; }
 function showSuccess(msg){ const res=document.getElementById('results'); res.innerHTML=`<div class="success">${msg}</div>`; res.style.display='block'; }
 
-// Conversión anchos (ExcelJS ≈ caracteres)
 const PX_PER_CHAR = 7;
 const widthFromPx = (px) => +(px / PX_PER_CHAR).toFixed(2);
 
-// Cambio competición → muestra/oculta selector GP
+/* ========== INIT UI ========= */
+document.addEventListener('DOMContentLoaded', () => {
+  const selComp = document.getElementById('competitionSelect');
+  const inJ = document.getElementById('fileInputJornada');
+  const inT = document.getElementById('fileInputTotales');
+  const bJ = document.getElementById('processJornadaBtn');
+  const bT = document.getElementById('processTotalesBtn');
+  const bD = document.getElementById('downloadBtn');
+
+  // Listeners
+  selComp.addEventListener('change', onCompetitionChange);
+  if (inJ) inJ.addEventListener('change', () => {
+    bJ.disabled = !(inJ.files && inJ.files.length);
+    fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[];
+    currentProcess='jornada';
+  });
+  if (inT) inT.addEventListener('change', () => {
+    bT.disabled = !(inT.files && inT.files.length) || (competitionType!=='liga');
+    fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[];
+    currentProcess='totales';
+  });
+
+  // Dispatchers
+  bJ.addEventListener('click', () => (competitionType==='gp' ? processJornada_GP() : processJornada_LIGA_V14()));
+  bT.addEventListener('click', () => (competitionType==='gp' ? showError('Totales no aplica a GP') : processTotales_LIGA_V14()));
+  bD.addEventListener('click', () => (competitionType==='gp' ? downloadExcel_GP() : downloadExcel_LIGA_V14()));
+
+  // Fuerza estado inicial y visibilidad del selector GP
+  onCompetitionChange();
+});
+
 function onCompetitionChange(){
   const sel = document.getElementById('competitionSelect');
   competitionType = sel.value;
-  document.getElementById('gpRoundBox').style.display = (competitionType==='gp') ? '' : 'none';
+  const gpBox = document.getElementById('gpRoundBox');
+  gpBox.style.display = (competitionType==='gp') ? '' : 'none';
 
-  // Reset UI de descarga al cambiar modo
+  // Totales solo en liga
+  const inT = document.getElementById('fileInputTotales');
+  document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga') || !(inT.files && inT.files.length);
+
+  // Reset descarga
   document.getElementById('results').style.display = 'none';
   document.getElementById('downloadSection').style.display = 'none';
   document.getElementById('downloadBtn').disabled = true;
-
-  // Botón Totales solo útil en Liga
-  const inT = document.getElementById('fileInputTotales');
-  document.getElementById('processTotalesBtn').disabled = (competitionType!=='liga') || !(inT.files && inT.files.length);
-}
-
-function onFilesJornadaChange(){
-  const inJ = document.getElementById('fileInputJornada');
-  document.getElementById('processJornadaBtn').disabled = !(inJ.files && inJ.files.length);
-  fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[];
-  currentProcess = 'jornada';
-}
-function onFilesTotalesChange(){
-  const inT = document.getElementById('fileInputTotales');
-  document.getElementById('processTotalesBtn').disabled = !(inT.files && inT.files.length);
-  fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[];
-  currentProcess = 'totales';
 }
 
 /* ================================================================
@@ -792,39 +802,23 @@ function parseLogFileSymbols_V14(content){
 
 /* ====== FIN BLOQUE LIGA (V14 OK ESTANCO) — NO TOCAR ====== */
 
-/* ================================================================
-   ==================== BLOQUE GP (CORREGIDO) =====================
-   ================================================================ */
 
-// Dispatcher helpers
-function processJornada_DISPATCH(){ return (competitionType==='gp') ? processJornada_GP() : processJornada_LIGA_V14(); }
-function processTotales_DISPATCH(){ return (competitionType==='gp') ? showError('Totales no aplica a GP') : processTotales_LIGA_V14(); }
-function downloadExcel_DISPATCH(){ return (competitionType==='gp') ? downloadExcel_GP() : downloadExcel_LIGA_V14(); }
+/* ========================= BLOQUE GP (ACTUALIZADO) ========================= */
 
-// === Utilidades GP ===
-const GP_TABLE = [20,17,15,13,11,10,9,8,7,6,5,4,3,2,1]; // 1..15; 16+ → 0
+// Tabla fija de puntos por posición (1..15). 16+ → 0
+const GP_TABLE = [20,17,15,13,11,10,9,8,7,6,5,4,3,2,1];
 
 function detectGroupName(lines, filename=''){
-  // Busca "GRUPO X"
-  let group = '';
-  let eqIdx = lines.findIndex(l=>/^\s*CLASIFICACION\s+EQUIPOS/i.test(l));
-  if (eqIdx !== -1){
-    for (let i = eqIdx+1; i < Math.min(eqIdx+5, lines.length); i++){
-      const m = lines[i].match(/^\s*(GRUPO\s+[A-ZÑÁÉÍÓÚ])\b/i);
-      if (m){ group = m[1].toUpperCase().replace(/\s+/g,' '); break; }
-    }
+  // Busca una línea "GRUPO X"
+  for (const l of lines){
+    const m = l.match(/^\s*GRUPO\s+([A-ZÑÁÉÍÓÚ])\s*$/i);
+    if (m) return `GRUPO ${m[1].toUpperCase()}`;
   }
-  if (!group){
-    for (const l of lines){
-      const m = l.match(/^\s*GRUPO\s+([A-ZÑÁÉÍÓÚ])\s*$/i);
-      if (m){ group = `GRUPO ${m[1].toUpperCase()}`; break; }
-    }
-  }
-  if (!group && filename){
+  if (filename){
     const m = filename.match(/GRUPO[_\s-]?([A-ZÑ])/i);
-    if (m) group = `GRUPO ${m[1].toUpperCase()}`;
+    if (m) return `GRUPO ${m[1].toUpperCase()}`;
   }
-  return group; // si queda vacío, se mostrará vacío
+  return ''; // si no aparece, dejar vacío
 }
 
 function parseGPLog(text, filename=''){
@@ -837,58 +831,60 @@ function parseGPLog(text, filename=''){
     if (/^CLASIFICACION\s+INDIVIDUAL/i.test(L)) continue;
     if (/^GRUPO\s+/i.test(L)) continue;
 
-    // Línea típica: NICK  NN   Aces:X   Scr:Y   Palos:Z   (ausente → "NO ESTUVO PRESENTE")
+    // Aceptamos CUALQUIER nick, incluidos símbolos [ ] ^ etc.
+    // Formato típico:  NICK  PTS  Aces:X  Scr:Y  Palos:Z
     const absent = /NO\s+ESTUVO\s+PRESENTE/i.test(L);
     const m = L.match(/^(.+?)\s+(-?\d+)\s+(?:Aces:\s*(-?\d+))?\s+Scr:\s*(-?\d+)\s+Palos:\s*(-?\d+)/i);
     if (m){
       const name = (m[1]||'').trim();
       if (!name) continue;
-      if (/^\[?NOTEBOOK\]?$/i.test(name)) continue;
       players.push({
-        name: name.toUpperCase(),
+        name: name.toUpperCase(),     // mantenemos símbolos tal cual, solo mayúsculas
         pts:  absent ? 0 : parseInt(m[2]||'0',10),
-        pos:  0, // posición interna para GPP (no se muestra)
-        scr:  absent ? 0 : parseInt(m[4]||'0',10),
         ace:  absent ? 0 : parseInt(m[3]||'0',10),
+        scr:  absent ? 0 : parseInt(m[4]||'0',10),
         pal:  absent ? 0 : parseInt(m[5]||'0',10), // POSTES (palos)
-        present: !absent
+        present: !absent,
+        pos: 0,
+        gpp: 0
       });
       continue;
     }
   }
 
-  // Ranking por PTS desc, en empate por SCR desc (sirve para POSición interna)
-  const presentPlayers = players.filter(p=>p.present).sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
-
-  // Posiciones con empates
-  for (let i=0, pos=1; i<presentPlayers.length; ){
+  // Calcular posiciones (solo presentes), por PTS desc, luego SCR desc, luego ACE desc
+  const present = players.filter(p=>p.present).sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
+  for (let i=0, pos=1; i<present.length; ){
     let j=i+1;
-    while (j<presentPlayers.length &&
-           presentPlayers[j].pts===presentPlayers[i].pts &&
-           presentPlayers[j].scr===presentPlayers[i].scr){ j++; }
-    for (let k=i;k<j;k++) presentPlayers[k].pos = pos;
+    while (j<present.length &&
+           present[j].pts===present[i].pts &&
+           present[j].scr===present[i].scr &&
+           present[j].ace===present[i].ace) j++;
+    for (let k=i;k<j;k++) present[k].pos = pos;
     pos += (j-i); i = j;
   }
 
-  // GPP por media de posiciones ocupadas
-  for (let i=0; i<presentPlayers.length; ){
-    const p0 = presentPlayers[i]; let j=i+1;
-    while (j<presentPlayers.length && presentPlayers[j].pos===p0.pos) j++;
-    const start = p0.pos, end = start + (j-i) - 1;
+  // GPP por media de posiciones empatadas
+  for (let i=0; i<present.length; ){
+    const startPos = present[i].pos;
+    let j=i+1; while (j<present.length && present[j].pos===startPos) j++;
+    const endPos = startPos + (j-i) - 1;
     const vals = [];
-    for (let r=start;r<=end;r++){ const idx=r-1; vals.push(idx<GP_TABLE.length?GP_TABLE[idx]:0); }
+    for (let r=startPos; r<=endPos; r++){
+      const idx = r-1; vals.push(idx<GP_TABLE.length ? GP_TABLE[idx] : 0);
+    }
     const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
-    for (let k=i;k<j;k++) presentPlayers[k].gpp = +avg.toFixed(2);
+    for (let k=i;k<j;k++) present[k].gpp = +avg.toFixed(2);
     i = j;
   }
 
-  const mapByName = Object.fromEntries(presentPlayers.map(p=>[p.name,p]));
+  // Asignar a array completo (los ausentes quedan con gpp=0)
+  const map = Object.fromEntries(present.map(p=>[p.name,p]));
   players.forEach(p=>{
-    if (!p.present){ p.gpp = 0; p.pos = 0; }
-    else { p.gpp = mapByName[p.name].gpp; p.pos = mapByName[p.name].pos; }
+    if (p.present){ const q = map[p.name]; p.pos = q.pos; p.gpp = q.gpp; }
   });
 
-  // Orden final por PTS desc / SCR desc
+  // Orden final por PTS desc / SCR desc / ACE desc (ausentes al final si todos 0)
   players.sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
   return { group: groupName, players };
 }
@@ -896,16 +892,17 @@ function parseGPLog(text, filename=''){
 function processJornada_GP(){
   const files = document.getElementById('fileInputJornada').files;
   if (!files || files.length === 0) return showError('Selecciona al menos un archivo de log (GP)');
+
   processedData = []; let processed = 0;
 
   Array.from(files).forEach(async (file, index)=>{
-    const text = await file.text();
     try{
+      const text = await file.text();
       const group = parseGPLog(text, file.name);
       processedData[index] = group;
       processed++;
       if (processed === files.length){
-        // Orden alfabético por etiqueta de grupo
+        // Orden alfabético por grupo
         processedData = processedData.filter(Boolean).sort((a,b)=> String(a.group||'').localeCompare(String(b.group||''),'es',{sensitivity:'base'}));
         const res = document.getElementById('results');
         res.innerHTML = `<div class="success">GP: ${files.length} archivo(s) analizado(s). Pulsa “Descargar Excel”.</div>`;
@@ -914,93 +911,88 @@ function processJornada_GP(){
         document.getElementById('downloadBtn').disabled = false;
         currentProcess = 'jornada';
       }
-    }catch(err){
-      showError(`Error GP en ${file.name}: ${err.message}`);
-    }
+    }catch(err){ showError(`Error GP en ${file.name}: ${err.message}`); }
   });
 }
 
-// Construye hoja GP con margen izq = 1 col, separación entre grupos = 4 col, margen superior = 1 fila
 function buildGPSheet(ws, groups){
-  // Parámetros
-  const leftMarginCols = 1;         // margen izquierdo = 1
-  const betweenGroupsCols = 4;      // separación entre grupos = 4
-  const rightMarginCols = 1;        // margen derecho simétrico
+  // Parámetros y anchos
+  const leftMarginCols = 1, rightMarginCols = 1, betweenGroupsCols = 4;
   const marginW = widthFromPx(24);
   const nameW   = widthFromPx(150);
   const numW    = widthFromPx(40);
-  const bandARGB = 'FF0B7D7D';
+  const bandARGB = 'FF0B7D7D';   // cabecera
   const whiteARGB = 'FFFFFFFF';
 
-  // GPx seleccionado
-  const gpRoundSelect = document.getElementById('gpRoundSelect');
-  const gpRound = gpRoundSelect ? Math.min(Math.max(parseInt(gpRoundSelect.value,10)||1,1),5) : 1;
+  // GPx elegido
+  const gpRound = Math.min(Math.max(parseInt(document.getElementById('gpRoundSelect')?.value || '1',10),1),5);
   const GPP_LABEL = `GP${gpRound}`;
 
-  try { ws.views = [{ state: 'normal', showGridLines: false }]; } catch {}
+  ws.views = [{ state: 'normal', showGridLines: false }];
 
-  // --- Fila vacía arriba (margen superior) ---
+  // Margen superior 1 fila
   ws.spliceRows(1, 0, []);
   try { ws.getRow(1).height = 7.5; } catch {}
 
-  // Columnas totales
+  // Definir columnas totales
   const totalCols = leftMarginCols + (groups.length * 6) + ((groups.length - 1) * betweenGroupsCols) + rightMarginCols;
   ws.columns = Array.from({length: totalCols}, ()=>({ width: 11 }));
 
   // Márgenes laterales
-  for (let c=1; c<=leftMarginCols; c++) ws.getColumn(c).width = marginW;                                   // margen izquierdo = 1
-  for (let c=totalCols-rightMarginCols+1; c<=totalCols; c++) ws.getColumn(c).width = marginW;               // margen derecho = 1
+  ws.getColumn(1).width = marginW;                                       // izq
+  ws.getColumn(totalCols).width = marginW;                               // dcha
 
-  // Encabezado COLOREADO en la SEGUNDA FILA (fila 2)
   const headerRow = 2;
   const dataStartRow = headerRow + 1;
   let baseCol = leftMarginCols + 1;
 
   groups.forEach((g, idx)=>{
-    // Cabecera: [GRUPO X, GPx, PTS, POS(=POSTES), SCR, ACE]
+    // Cabecera coloreada (bordes solo aquí)
     const headers = [ (g.group || ''), GPP_LABEL, 'PTS', 'POS', 'SCR', 'ACE' ];
     for (let off=0; off<6; off++){
-      const cell = ws.getCell(headerRow, baseCol+off);
-      cell.value = headers[off] || '';
-      cell.font = { bold:true, color:{argb:whiteARGB} };
-      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bandARGB} };
-      cell.alignment = { horizontal: off===0 ? 'left' : 'center', vertical:'middle' };
-      // Bordes SOLO en cabecera
-      cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+      const c = ws.getCell(headerRow, baseCol+off);
+      c.value = headers[off] || '';
+      c.font = { bold:true, color:{argb:whiteARGB} };
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bandARGB} };
+      c.alignment = { horizontal: off===0 ? 'left' : 'center', vertical:'middle' };
+      c.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     }
 
-    // Anchos
+    // Anchos de bloque
     ws.getColumn(baseCol).width = nameW;
     for (let off=1; off<=5; off++) ws.getColumn(baseCol+off).width = numW;
 
-    // Datos desde fila 3 (sin bordes)
+    // Datos (sin bordes). POS = POSTES (palos). 0→blanco salvo GPX.
     let r = dataStartRow;
     const blankIfZero = (v)=> (v === 0 ? '' : v);
     (g.players || []).forEach(p=>{
-      // Nombre
-      const cN = ws.getCell(r, baseCol);
-      cN.value = p.name || '';
-      cN.alignment = { horizontal:'left', vertical:'middle' };
+      ws.getCell(r, baseCol).value = p.name || '';
+      ws.getCell(r, baseCol).alignment = { horizontal:'left', vertical:'middle' };
 
-      // GPx (mantener 0 visible)
-      const cG = ws.getCell(r, baseCol+1);
-      cG.value = (p.gpp ?? 0);
-      cG.alignment = { horizontal:'center', vertical:'middle' };
+      const gpxCell = ws.getCell(r, baseCol+1);
+      gpxCell.value = (p.gpp ?? 0);                         // mantener 0 visible
+      gpxCell.alignment = { horizontal:'center', vertical:'middle' };
+      gpxCell.font = { bold: true };                        // GPX en negrita
 
-      // PTS / POS(=POSTES) / SCR / ACE  → 0 → blanco (excepto GPx)
-      const cPTS = ws.getCell(r, baseCol+2); cPTS.value = blankIfZero(p.pts ?? 0); cPTS.alignment = { horizontal:'center', vertical:'middle' };
-      const cPOS = ws.getCell(r, baseCol+3); cPOS.value = blankIfZero(p.pal ?? 0); cPOS.alignment = { horizontal:'center', vertical:'middle' }; // POS = POSTES
-      const cSCR = ws.getCell(r, baseCol+4); cSCR.value = blankIfZero(p.scr ?? 0); cSCR.alignment = { horizontal:'center', vertical:'middle' };
-      const cACE = ws.getCell(r, baseCol+5); cACE.value = blankIfZero(p.ace ?? 0); cACE.alignment = { horizontal:'center', vertical:'middle' };
+      ws.getCell(r, baseCol+2).value = blankIfZero(p.pts ?? 0); // PTS
+      ws.getCell(r, baseCol+2).alignment = { horizontal:'center', vertical:'middle' };
+
+      ws.getCell(r, baseCol+3).value = blankIfZero(p.pal ?? 0); // POS = POSTES
+      ws.getCell(r, baseCol+3).alignment = { horizontal:'center', vertical:'middle' };
+
+      ws.getCell(r, baseCol+4).value = blankIfZero(p.scr ?? 0); // SCR
+      ws.getCell(r, baseCol+4).alignment = { horizontal:'center', vertical:'middle' };
+
+      ws.getCell(r, baseCol+5).value = blankIfZero(p.ace ?? 0); // ACE
+      ws.getCell(r, baseCol+5).alignment = { horizontal:'center', vertical:'middle' };
 
       r++;
     });
 
-    // Separación entre grupos = 4 columnas
+    // Separación entre grupos
     if (idx < groups.length - 1){
       for (let s=0; s<betweenGroupsCols; s++){
-        const col = baseCol + 6 + s;
-        ws.getColumn(col).width = marginW;
+        ws.getColumn(baseCol + 6 + s).width = marginW;
       }
       baseCol += 6 + betweenGroupsCols;
     } else {
@@ -1008,7 +1000,7 @@ function buildGPSheet(ws, groups){
     }
   });
 
-  // Config impresión
+  // Ajustes de impresión
   try {
     ws.pageSetup = {
       orientation: 'landscape',
@@ -1023,7 +1015,7 @@ async function downloadExcel_GP(){
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
 
-  const ws = createWorksheetNoGrid(wb, 'GP');
+  const ws = wb.addWorksheet('GP', { views:[{ state:'normal', showGridLines:false }] });
   buildGPSheet(ws, processedData);
 
   const uint8 = await wb.xlsx.writeBuffer();
@@ -1031,8 +1023,6 @@ async function downloadExcel_GP(){
   saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_${stamp}.xlsx`);
   showSuccess('Excel GP generado correctamente.');
 }
-
-/* ===================== FIN BLOQUE GP ===================== */
 </script>
 </body>
 </html>

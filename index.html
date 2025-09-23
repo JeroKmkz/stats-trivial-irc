@@ -926,14 +926,15 @@ function buildGPSheet(ws, groups){
     // Datos (sin bordes)
     let r = dataStartRow;
     const putStat = (col, val, present) => {
-      const cell = ws.getCell(r, col);
-      if (!present) { cell.value = null; }
-      else {
-        const n = Number(val || 0);
-        cell.value = (n === 0) ? null : n;
-      }
-      cell.alignment = { horizontal:'center', vertical:'middle' };
-    };
+  const cell = ws.getCell(r, col);
+  if (!present) { 
+    cell.value = null; 
+  } else {
+    const n = Number(val || 0);
+    cell.value = n;  // Mostrar el valor real, incluyendo 0
+  }
+  cell.alignment = { horizontal:'center', vertical:'middle' };
+};
 
     (g.players || []).forEach(p=>{
       // Nick

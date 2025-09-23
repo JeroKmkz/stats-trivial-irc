@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentProcess='jornada';
   });
   inT.addEventListener('change', () => {
-    bT.disabled = !(inT.files && inT.files.length) || (competitionType!=='liga');
+    bT.disabled = !(inT.files && inT.files.length); // Eliminar la restricción de solo Liga
     fileNames = inT.files? Array.from(inT.files).map(f=>f.name):[];
     currentProcess='totales';
   });
@@ -163,10 +163,9 @@ function onCompetitionChange(){
   document.getElementById('downloadSection').style.display = 'none';
   document.getElementById('downloadBtn').disabled = true;
 
-  // Botón Totales habilitado tanto en Liga como GP
+  // Botón Totales habilitado tanto en Liga como GP (si hay archivos)
   const inT = document.getElementById('fileInputTotales');
   document.getElementById('processTotalesBtn').disabled = !(inT.files && inT.files.length);
-}
 
 /* ================================================================
    ====== INICIO BLOQUE LIGA (V14 OK ESTANCO) — NO TOCAR ======

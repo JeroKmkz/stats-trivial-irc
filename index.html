@@ -925,16 +925,20 @@ function buildGPSheet(ws, groups){
 
     // Datos (sin bordes)
     let r = dataStartRow;
-    const putStat = (col, val, present) => {
-  const cell = ws.getCell(r, col);
-  if (!present) { 
-    cell.value = null; 
-  } else {
-    const n = Number(val || 0);
-    cell.value = n;  // Mostrar el valor real, incluyendo 0
-  }
-  cell.alignment = { horizontal:'center', vertical:'middle' };
-};
+    const putStat = (col, val, present, isPTS = false) => {
+      const cell = ws.getCell(r, col);
+      if (!present) { 
+        cell.value = null; 
+      } else {
+        const n = Number(val || 0);
+        if (isPTS) {
+          cell.value = n;  // PTS: mostrar siempre el valor real, incluyendo 0
+        } else {
+          cell.value = (n === 0) ? null : n;  // SCR/ACE/POS: ocultar si es 0
+        }
+      }
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+    };
 
     (g.players || []).forEach(p=>{
       // Nick
@@ -949,10 +953,10 @@ function buildGPSheet(ws, groups){
       cG.font = { bold:true };
 
       // PTS / POS(=POSTES) / SCR / ACE
-      putStat(baseCol+2, p.pts, p.present); // PTS
-      putStat(baseCol+3, p.pal, p.present); // POS = POSTES
-      putStat(baseCol+4, p.scr, p.present); // SCR
-      putStat(baseCol+5, p.ace, p.present); // ACE
+      putStat(baseCol+2, p.pts, p.present, true);  // PTS (true = mostrar 0)
+      putStat(baseCol+3, p.pal, p.present, false); // POS = POSTES (false = ocultar 0)
+      putStat(baseCol+4, p.scr, p.present, false); // SCR (false = ocultar 0)
+      putStat(baseCol+5, p.ace, p.present, false); // ACE (false = ocultar 0)
 
       r++;
     });

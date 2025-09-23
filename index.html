@@ -825,17 +825,13 @@ function parseGPLog(text, filename=''){
   // Ranking SOLO con presentes (PTS desc, SCR desc, ACE desc)
   const present = players.filter(p=>p.present).sort((a,b)=> (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace));
 
-  // Posiciones con empates
-  for (let i=0, pos=1; i<present.length; ){
-    let j=i+1;
-    while (j<present.length &&
-           present[j].pts===present[i].pts &&
-           present[j].scr===present[i].scr &&
-           present[j].ace===present[i].ace) j++;
-    for (let k=i;k<j;k++) present[k].pos = pos;
-    pos += (j-i); i = j;
-  }
-
+  // Posiciones con empates (SOLO por puntos)
+for (let i=0, pos=1; i<present.length; ){
+  let j=i+1;
+  while (j<present.length && present[j].pts===present[i].pts) j++;
+  for (let k=i;k<j;k++) present[k].pos = pos;
+  pos += (j-i); i = j;
+}
   // GPP por media de posiciones empatadas
   for (let i=0; i<present.length; ){
     const startPos = present[i].pos;

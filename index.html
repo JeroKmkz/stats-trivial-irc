@@ -800,7 +800,7 @@ function parseGPLog(text, filename=''){
     if (/^GRUPO\s+/i.test(L)) continue;
 
     // AUSENTE sin números: "NICK    NO ESTUVO PRESENTE"
-    const absentMatch = L.match(/^(.+?)\s+NO\s+ESTUVO\s+PRESENTE$/i);
+    const absentMatch = L.match(/^(\S+).*?\bNO\s+ESTUVO\s+PRESENTE$/i);
     if (absentMatch){
       const name = absentMatch[1].trim(); if (!name) continue;
       players.push({ name: name.toUpperCase(), pts:0, pal:0, scr:0, ace:0, present:false, pos:0, gpp:0 });

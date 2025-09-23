@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function onCompetitionChange(){
   competitionType = document.getElementById('competitionSelect').value;
   const gpBox = document.getElementById('gpRoundBox');
-  gpBox.style.display = (competitionType==='gp') ? '' : 'none';
+  gpBox.style.display = (competitionType==='gp') ? 'inline-block' : 'none';
 
   // Reset UI de descarga al cambiar modo
   document.getElementById('results').style.display = 'none';

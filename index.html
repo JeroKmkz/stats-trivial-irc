@@ -1219,10 +1219,10 @@ function buildGPTotalsSheet(ws, data){
   const marginW = widthFromPx(24);
   const nameW = widthFromPx(150);
   const numW = widthFromPx(50);
-  const gpW = widthFromPx(25); // Columnas GP más estrechas
+  const gpW = widthFromPx(32); // Columnas GP y PAR más anchas
   const bandARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
-  const greenDarkARGB = 'FF2D5016'; // Verde oscuro para TOTAL
+  const greenDarkARGB = 'FF4A7C59'; // Verde más claro para TOTAL
   const redARGB = 'FFCC0000'; // Rojo para DESC
   
   ws.views = [{ state: 'normal', showGridLines: false }];
@@ -1260,7 +1260,7 @@ function buildGPTotalsSheet(ws, data){
     ws.getColumn(baseCol + 6).width = gpW;  // GP3
     ws.getColumn(baseCol + 7).width = gpW;  // GP4
     ws.getColumn(baseCol + 8).width = gpW;  // GP5
-    ws.getColumn(baseCol + 9).width = numW; // PAR
+    ws.getColumn(baseCol + 9).width = gpW; // PAR (mismo ancho que GP)
     
     // Cabecera del grupo
     const headers = ['TOTAL', 'GLOBAL', 'DESC', groupName, 'GP1', 'GP2', 'GP3', 'GP4', 'GP5', 'PAR'];
@@ -1317,13 +1317,13 @@ function buildGPTotalsSheet(ws, data){
       const parCell = ws.getCell(currentRow, baseCol + 9);
       parCell.value = `${partidasJugadas}/${numJornadas}`;
       parCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      parCell.font = { bold: true };
+      parCell.font = { bold: false }; // Sin negrita para PAR
       
       // Línea recta debajo del jugador 12
       if (playerIndex === 11) { // Jugador 12 (índice 11)
         // Dibujar línea en las columnas de separación (si no es el último grupo)
         if (groupIndex < groups.length - 1) {
-          const lineRow = currentRow + 1;
+          const lineRow = currentRow; // Subir una fila (sin +1)
           const separatorStartCol = baseCol + colsPerGroup;
           for (let sepCol = 0; sepCol < separatorCols; sepCol++) {
             const lineCell = ws.getCell(lineRow, separatorStartCol + sepCol);

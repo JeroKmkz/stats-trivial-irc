@@ -1108,7 +1108,7 @@ function extractGPDataFromExcel(worksheet){
   return groups.length > 0 ? groups : null;
 }
 
-// Calcular totales GP (GLOBAL, DESC, TOTAL)
+// Calcular totales GP (GLOBAL, DESC, TOTAL) - versión mejorada
 function calculateGPTotals(allJornadas){
   const playerStats = {}; // {playerName: {group, jornadas: [gpp1, gpp2, ...], global, desc, total}}
   
@@ -1119,16 +1119,11 @@ function calculateGPTotals(allJornadas){
         if (!playerStats[player.name]){
           playerStats[player.name] = {
             group: group.group,
-            jornadas: [],
+            jornadas: Array(allJornadas.length).fill(0), // Inicializar con 0s
             global: 0,
             desc: 0,
             total: 0
           };
-        }
-        
-        // Asegurar que el array tiene el tamaño correcto
-        while (playerStats[player.name].jornadas.length <= jornadaIndex){
-          playerStats[player.name].jornadas.push(0);
         }
         
         playerStats[player.name].jornadas[jornadaIndex] = player.gpp;
@@ -1207,7 +1202,7 @@ async function downloadExcel_GP_Totales(){
   wb.created = new Date();
   
   const ws = wb.addWorksheet('Totales GP', { views:[{ state:'normal', showGridLines:false }] });
-  buildGPTotalsSheet(ws, processedData);
+  // Calcular totales GP (GLOBAL, DESC, TOT(ws, processedData);
   
   const uint8 = await wb.xlsx.writeBuffer();
   const stamp = new Date().toISOString().slice(0,10);
@@ -1216,12 +1211,15 @@ async function downloadExcel_GP_Totales(){
 }
 
 // Construir hoja de totales GP
-function buildGPTotalsSheet(ws, data){
+function // Calcular totales GP (GLOBAL, DESC, TOT(ws, data){
   const marginW = widthFromPx(24);
   const nameW = widthFromPx(150);
   const numW = widthFromPx(50);
+  const gpW = widthFromPx(25); // Columnas GP más estrechas
   const bandARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
+  const greenDarkARGB = 'FF2D5016'; // Verde oscuro para TOTAL
+  const redARGB = 'FFCC0000'; // Rojo para DESC
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
@@ -1232,28 +1230,38 @@ function buildGPTotalsSheet(ws, data){
   const groups = Object.keys(data.groups).sort();
   const numJornadas = data.numJornadas;
   
-  // Calcular columnas necesarias: margen + TOTAL + GLOBAL + DESC + nombre + GP1-GP5 + margen
-  const totalCols = 1 + 3 + 1 + 5 + 1;
+  // Calcular columnas: margen + (TOTAL+GLOBAL+DESC+nombre+GP1-GP5+PAR) * numGrupos + separadores + margen
+  const colsPerGroup = 10; // TOTAL+GLOBAL+DESC+nombre+GP1+GP2+GP3+GP4+GP5+PAR
+  const separatorCols = 2; // 2 columnas vacías entre grupos
+  const totalCols = 1 + (colsPerGroup * groups.length) + (separatorCols * (groups.length - 1)) + 1;
+  
   ws.columns = Array.from({length: totalCols}, () => ({ width: 11 }));
   
   // Configurar anchos
-  ws.getColumn(1).width = marginW;    // margen izq
-  ws.getColumn(2).width = numW;       // TOTAL
-  ws.getColumn(3).width = numW;       // GLOBAL  
-  ws.getColumn(4).width = numW;       // DESC
-  ws.getColumn(5).width = nameW;      // nombre
-  // GP1-GP5 mantienen ancho por defecto
+  ws.getColumn(1).width = marginW; // margen izq
   ws.getColumn(totalCols).width = marginW; // margen der
   
-  let currentRow = 2;
+  let baseCol = 2; // Empezar en columna 2
   
   groups.forEach((groupName, groupIndex) => {
     const players = data.groups[groupName];
     
+    // Configurar anchos de este grupo
+    ws.getColumn(baseCol).width = numW;     // TOTAL
+    ws.getColumn(baseCol + 1).width = numW; // GLOBAL  
+    ws.getColumn(baseCol + 2).width = numW; // DESC
+    ws.getColumn(baseCol + 3).width = nameW; // nombre
+    ws.getColumn(baseCol + 4).width = gpW;  // GP1
+    ws.getColumn(baseCol + 5).width = gpW;  // GP2
+    ws.getColumn(baseCol + 6).width = gpW;  // GP3
+    ws.getColumn(baseCol + 7).width = gpW;  // GP4
+    ws.getColumn(baseCol + 8).width = gpW;  // GP5
+    ws.getColumn(baseCol + 9).width = numW; // PAR
+    
     // Cabecera del grupo
-    const headers = ['TOTAL', 'GLOBAL', 'DESC', groupName, 'GP1', 'GP2', 'GP3', 'GP4', 'GP5'];
+    const headers = ['TOTAL', 'GLOBAL', 'DESC', groupName, 'GP1', 'GP2', 'GP3', 'GP4', 'GP5', 'PAR'];
     for (let col = 0; col < headers.length; col++){
-      const cell = ws.getCell(currentRow, col + 2);
+      const cell = ws.getCell(2, baseCol + col);
       cell.value = headers[col];
       cell.font = { bold: true, color: { argb: whiteARGB } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bandARGB } };
@@ -1264,41 +1272,73 @@ function buildGPTotalsSheet(ws, data){
       };
     }
     
-    currentRow++;
-    
     // Datos de jugadores
-    players.forEach(player => {
+    players.forEach((player, playerIndex) => {
+      const currentRow = 3 + playerIndex;
+      
       // TOTAL
-      ws.getCell(currentRow, 2).value = player.total;
-      ws.getCell(currentRow, 2).alignment = { horizontal: 'center', vertical: 'middle' };
+      const totalCell = ws.getCell(currentRow, baseCol);
+      totalCell.value = player.total;
+      totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      totalCell.font = { bold: true, color: { argb: greenDarkARGB } };
       
       // GLOBAL  
-      ws.getCell(currentRow, 3).value = player.global;
-      ws.getCell(currentRow, 3).alignment = { horizontal: 'center', vertical: 'middle' };
+      const globalCell = ws.getCell(currentRow, baseCol + 1);
+      globalCell.value = player.global;
+      globalCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      globalCell.font = { bold: true };
       
       // DESC
-      ws.getCell(currentRow, 4).value = player.desc;
-      ws.getCell(currentRow, 4).alignment = { horizontal: 'center', vertical: 'middle' };
+      const descCell = ws.getCell(currentRow, baseCol + 2);
+      descCell.value = player.desc;
+      descCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      descCell.font = { bold: true, color: { argb: redARGB } };
       
       // Nombre
-      ws.getCell(currentRow, 5).value = player.name;
-      ws.getCell(currentRow, 5).alignment = { horizontal: 'left', vertical: 'middle' };
+      const nameCell = ws.getCell(currentRow, baseCol + 3);
+      nameCell.value = player.name;
+      nameCell.alignment = { horizontal: 'left', vertical: 'middle' };
       
-      // GP1-GP5
+      // GP1-GP5 (mostrar siempre valores, incluyendo 0)
       for (let i = 0; i < 5; i++){
         const gppValue = i < player.jornadas.length ? player.jornadas[i] : 0;
-        if (gppValue > 0){
-          ws.getCell(currentRow, 6 + i).value = gppValue;
-        }
-        ws.getCell(currentRow, 6 + i).alignment = { horizontal: 'center', vertical: 'middle' };
+        const gpCell = ws.getCell(currentRow, baseCol + 4 + i);
+        gpCell.value = gppValue;
+        gpCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        gpCell.font = { bold: true };
       }
       
-      currentRow++;
+      // PAR (Participación)
+      const partidasJugadas = player.jornadas.filter(gpp => gpp > 0).length;
+      const parCell = ws.getCell(currentRow, baseCol + 9);
+      parCell.value = `${partidasJugadas}/${numJornadas}`;
+      parCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      parCell.font = { bold: true };
+      
+      // Línea recta debajo del jugador 12
+      if (playerIndex === 11) { // Jugador 12 (índice 11)
+        // Dibujar línea en las columnas de separación (si no es el último grupo)
+        if (groupIndex < groups.length - 1) {
+          const lineRow = currentRow + 1;
+          const separatorStartCol = baseCol + colsPerGroup;
+          for (let sepCol = 0; sepCol < separatorCols; sepCol++) {
+            const lineCell = ws.getCell(lineRow, separatorStartCol + sepCol);
+            lineCell.border = { 
+              bottom: { style: 'thick', color: { argb: 'FF000000' } } 
+            };
+          }
+        }
+      }
     });
     
-    // Espacio entre grupos (excepto el último)
-    if (groupIndex < groups.length - 1){
-      currentRow += 2;
+    // Mover a la siguiente posición de grupo
+    baseCol += colsPerGroup;
+    if (groupIndex < groups.length - 1) {
+      // Añadir separadores (2 columnas vacías)
+      for (let sep = 0; sep < separatorCols; sep++) {
+        ws.getColumn(baseCol + sep).width = widthFromPx(10);
+      }
+      baseCol += separatorCols;
     }
   });
   

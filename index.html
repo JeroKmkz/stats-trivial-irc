@@ -1068,40 +1068,30 @@ async function processTotales_GP(){
 function extractGPDataFromExcel(worksheet){
   const groups = [];
   const maxRows = worksheet.rowCount || 100;
-  const maxCols = worksheet.columnCount || 50;
   
-  // Buscar cabeceras de grupos en la fila 2 (después del margen)
-  for (let col = 1; col <= maxCols; col++){
-    const cellValue = worksheet.getCell(2, col).value;
+  // Buscar grupos en el Excel
+  for (let row = 1; row <= maxRows; row++){
+    const cellValue = worksheet.getCell(row, 1).value;
     if (cellValue && String(cellValue).match(/GRUPO\s+[A-Z]/i)){
       const groupName = String(cellValue).trim();
-      const gppCol = col + 1; // Columna GP1, GP2, etc.
       const players = [];
       
-      // Leer jugadores desde la fila 3 hacia abajo
-      for (let row = 3; row <= maxRows; row++){
-        const nameCell = worksheet.getCell(row, col);
-        const gppCell = worksheet.getCell(row, gppCol);
+      // Leer jugadores de este grupo (máximo 20 filas hacia abajo)
+      for (let playerRow = row + 1; playerRow <= row + 20; playerRow++){
+        const name = worksheet.getCell(playerRow, 1).value;
+        const gpp = worksheet.getCell(playerRow, 2).value;
         
-        if (!nameCell.value) break; // No más jugadores
+        if (!name) break; // No más jugadores
         
-        const name = String(nameCell.value).trim();
-        const gpp = Number(gppCell.value) || 0;
-        
-        if (name){
-          players.push({
-            name: name.toUpperCase(),
-            gpp: gpp
-          });
-        }
+        players.push({
+          name: String(name).trim().toUpperCase(),
+          gpp: Number(gpp) || 0
+        });
       }
       
       if (players.length > 0){
         groups.push({ group: groupName, players });
       }
-      
-      // Saltar al siguiente grupo (normalmente hay 4-6 columnas de separación)
-      col += 5;
     }
   }
   
@@ -1202,7 +1192,7 @@ async function downloadExcel_GP_Totales(){
   wb.created = new Date();
   
   const ws = wb.addWorksheet('Totales GP', { views:[{ state:'normal', showGridLines:false }] });
-  // Calcular totales GP (GLOBAL, DESC, TOT(ws, processedData);
+  buildGPTotalsSheet(ws, processedData);
   
   const uint8 = await wb.xlsx.writeBuffer();
   const stamp = new Date().toISOString().slice(0,10);

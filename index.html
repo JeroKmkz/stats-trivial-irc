@@ -1689,7 +1689,7 @@ function buildCopaSheet(ws, data) {
     const teamCount = Math.min(teams.length, 2);
     const widths = [widthFromPx(20)];
     for (let i = 0; i < teamCount; i++) {
-      widths.push(widthFromPx(121), widthFromPx(56), widthFromPx(70), widthFromPx(56), widthFromPx(56));
+      widths.push(widthFromPx(121), widthFromPx(35), widthFromPx(35), widthFromPx(35), widthFromPx(35));
       if (i < teamCount - 1) widths.push(widthFromPx(42));
     }
     ws.columns = widths.map(w => ({ width: w }));

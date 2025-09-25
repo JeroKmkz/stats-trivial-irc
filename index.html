@@ -109,7 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Ficheros
   inJ.addEventListener('change', () => {
-    bJ.disabled = !(inJ.files && inJ.files.length);
+    const hasFiles = inJ.files && inJ.files.length;
+    
+    // Para Copa, solo permitir 1 archivo
+    if (competitionType === 'copa' && hasFiles && inJ.files.length > 1) {
+      showError('Para la Copa solo se puede procesar un archivo');
+      bJ.disabled = true;
+      return;
+    }
+    
+    bJ.disabled = !hasFiles;
     fileNames = inJ.files? Array.from(inJ.files).map(f=>f.name):[];
     currentProcess='jornada';
   });

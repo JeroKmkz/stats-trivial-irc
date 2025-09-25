@@ -1567,7 +1567,7 @@ function buildCopaSheet(ws, data) {
       else if (globalPosition === 1) positionText = '2º'; 
       else if (globalPosition === 2) positionText = '3º';
       
-      headerRow.push(positionText, 'PU', 'SC', 'PO', 'AC');
+      headerRow.push(positionText, 'PU', 'PO', 'SC', 'AC');
       if (idx < teamPair.length - 1) headerRow.push('');
     });
     ws.getRow(currentRow).values = headerRow;
@@ -1575,7 +1575,7 @@ function buildCopaSheet(ws, data) {
     // Fila de totales de equipos
     const totalsRow = [''];
     teamPair.forEach((team, idx) => {
-      totalsRow.push(team.name, team.points, teamTotals[idx].scratches, teamTotals[idx].palos, teamTotals[idx].aces);
+      totalsRow.push(team.name, team.points, teamTotals[idx].palos, teamTotals[idx].scratches, teamTotals[idx].aces);
       if (idx < teamPair.length - 1) totalsRow.push('');
     });
     ws.getRow(currentRow + 1).values = totalsRow;
@@ -1606,10 +1606,8 @@ function buildCopaSheet(ws, data) {
         if (i === 0) {
           totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
           totalCell.font = { color: { argb: team.colors.fg.replace('#','FF') }, bold: true, size: 14 };
-        } else if (i === 1) {
-          totalCell.font = { bold: true, size: 12 };
         } else {
-          totalCell.font = { bold: false, size: 12 };
+          totalCell.font = { bold: true, size: 12 }; // Todos los valores del equipo en negrita
         }
         totalCell.alignment = { horizontal: 'center', vertical: 'center' };
       }
@@ -1634,8 +1632,8 @@ function buildCopaSheet(ws, data) {
           playerRow.push(
             player.name,
             player.points || 0,
-            valOrBlank(player.scratches || 0),
             valOrBlank(player.palos || 0),
+            valOrBlank(player.scratches || 0),
             valOrBlank(player.aces || 0)
           );
         } else {
@@ -1651,8 +1649,8 @@ function buildCopaSheet(ws, data) {
       teamPair.forEach((team, teamIdx) => {
         const player = team.players[playerIdx];
         if (player) {
-          const stats = [player.points || 0, player.scratches || 0, player.palos || 0, player.aces || 0];
-          const bests = [bestStats.points, bestStats.scratches, bestStats.palos, bestStats.aces];
+          const stats = [player.points || 0, player.palos || 0, player.scratches || 0, player.aces || 0];
+          const bests = [bestStats.points, bestStats.palos, bestStats.scratches, bestStats.aces];
           
           for (let j = 0; j < 5; j++) {
             const cell = ws.getCell(currentRow + rowsWritten, playerCol + j);

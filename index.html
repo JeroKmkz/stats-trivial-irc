@@ -1543,8 +1543,8 @@ function buildCopaSheet(ws, data) {
   ws.views = [{ state: 'normal', showGridLines: false }];
   let currentRow = 1;
   
-  for (let i = 0; i < teams.length; i += 2) {
-    const teamPair = teams.slice(i, i + 2);
+  for (let i = 0; i < teams.length; i += 3) {
+    const teamPair = teams.slice(i, i + 3);
     
     // Calcular totales de equipos
     const teamTotals = teamPair.map(team => {
@@ -1563,9 +1563,9 @@ function buildCopaSheet(ws, data) {
       const globalPosition = i + idx;
       let positionText = '';
       
-      if (globalPosition === 0) positionText = '1º';
-      else if (globalPosition === 1) positionText = '2º'; 
-      else if (globalPosition === 2) positionText = '3º';
+      if (globalPosition === 0) positionText = '🏆'; // Copa oro
+      else if (globalPosition === 1) positionText = '🥈'; // Copa plata  
+      else if (globalPosition === 2) positionText = '🥉'; // Copa bronce
       
       headerRow.push(positionText, 'PU', 'SC', 'PO', 'AC');
       if (idx < teamPair.length - 1) headerRow.push('');
@@ -1686,7 +1686,7 @@ function buildCopaSheet(ws, data) {
   
   // Configurar anchos
   if (teams.length > 0) {
-    const teamCount = Math.min(teams.length, 2);
+    const teamCount = Math.min(3, teams.length - i); // Hasta 3 equipos por fila
     const widths = [widthFromPx(20)];
     for (let i = 0; i < teamCount; i++) {
       widths.push(widthFromPx(121), widthFromPx(35), widthFromPx(35), widthFromPx(35), widthFromPx(35));

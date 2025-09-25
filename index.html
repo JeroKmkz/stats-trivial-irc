@@ -1563,9 +1563,9 @@ function buildCopaSheet(ws, data) {
       const globalPosition = i + idx;
       let positionText = '';
       
-      if (globalPosition === 0) positionText = '🥇'; // Copa oro
-      else if (globalPosition === 1) positionText = '🥈'; // Copa plata  
-      else if (globalPosition === 2) positionText = '🥉'; // Copa bronce
+      if (globalPosition === 0) positionText = '1º';
+      else if (globalPosition === 1) positionText = '2º'; 
+      else if (globalPosition === 2) positionText = '3º';
       
       headerRow.push(positionText, 'PU', 'SC', 'PO', 'AC');
       if (idx < teamPair.length - 1) headerRow.push('');

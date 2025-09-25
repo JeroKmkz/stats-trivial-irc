@@ -1014,7 +1014,8 @@ async function downloadExcel_GP(){
 
   const uint8 = await wb.xlsx.writeBuffer();
   const stamp = new Date().toISOString().slice(0,10);
-  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_${stamp}.xlsx`);
+  const gpRound = Math.min(Math.max(parseInt(document.getElementById('gpRoundSelect')?.value || '1',10),1),5);
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP${gpRound}.xlsx`);
   showSuccess('Excel GP generado correctamente.');
 }
 
@@ -1210,7 +1211,10 @@ async function downloadExcel_GP_Totales(){
   
   const uint8 = await wb.xlsx.writeBuffer();
   const stamp = new Date().toISOString().slice(0,10);
-  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_Totales_${stamp}.xlsx`);
+  // Extraer nombres base de los archivos (sin extensión)
+  const baseNames = fileNames.map(name => name.replace('.xlsx', '').replace('GP_', '').replace(/^\d{4}-\d{2}-\d{2}(\s+\d+)?$/, '').trim()).filter(name => name);
+  const jornadasStr = baseNames.length > 0 ? baseNames.join('+') : 'Multiples';
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `GP_Totales_${jornadasStr}.xlsx`);
   showSuccess('Excel Totales GP generado correctamente.');
 }
 

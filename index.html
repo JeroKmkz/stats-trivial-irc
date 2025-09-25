@@ -36,7 +36,7 @@
       <select id="competitionSelect">
         <option value="liga" selected>Liga</option>
         <option value="gp">GP</option>
-        <option value="copa" disabled>Copa (próx.)</option>
+        <option value="copa">Copa</option>
         <option value="relevos" disabled>Torneo Relevos (próx.)</option>
         <option value="master" disabled>Máster por Equipos (próx.)</option>
         <option value="posiciones" disabled>Torneo Posiciones (próx.)</option>
@@ -120,7 +120,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Botones
-  bJ.addEventListener('click', () => (competitionType==='gp' ? processJornada_GP() : processJornada_LIGA()));
+  bJ.addEventListener('click', () => {
+  if (competitionType === 'gp') {
+    processJornada_GP();
+  } else if (competitionType === 'copa') {
+    processJornada_COPA();
+  } else {
+    processJornada_LIGA();
+  }
+});
   bT.addEventListener('click', () => (competitionType==='gp' ? processTotales_GP() : processTotales_LIGA()));
   bD.addEventListener('click', () => {
     if (competitionType === 'gp') {
@@ -129,6 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         downloadExcel_GP();
       }
+    } else if (competitionType === 'copa') {
+      downloadExcel_COPA();
     } else {
       downloadExcel_LIGA();
     }
@@ -152,6 +162,10 @@ function onCompetitionChange(){
     title.textContent = '🏆 Totales GP';
     desc.textContent = 'Sube los Excels (.xlsx) de GP generados de cada jornada para obtener totales acumulados';
     btn.textContent = 'Generar Totales GP';
+  } else if (competitionType === 'copa') {
+    title.textContent = '🏆 Final de Copa';
+    desc.textContent = 'Sube el Excel (.xlsx) de la Copa para generar estadísticas finales';
+    btn.textContent = 'Generar Final Copa';
   } else {
     title.textContent = '🏆 Totales y Medias Liga';
     desc.textContent = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
@@ -163,9 +177,14 @@ function onCompetitionChange(){
   document.getElementById('downloadSection').style.display = 'none';
   document.getElementById('downloadBtn').disabled = true;
 
-  // Botón Totales habilitado tanto en Liga como GP (si hay archivos)
+  // Botón Totales habilitado en Liga y GP, deshabilitado en Copa
   const inT = document.getElementById('fileInputTotales');
-  document.getElementById('processTotalesBtn').disabled = !(inT.files && inT.files.length);
+  if (competitionType === 'copa') {
+    document.getElementById('processTotalesBtn').disabled = true;
+    document.getElementById('processTotalesBtn').style.opacity = '0.5';
+  } else {
+    document.getElementById('processTotalesBtn').disabled = !(inT.files && inT.files.length);
+    document.getElementById('processTotalesBtn').style.opacity = '1';
   }
 
 /* ================================================================
@@ -1385,6 +1404,37 @@ function buildGPTotalsSheet(ws, data){
   // Fila vacía abajo
   ws.addRow([]);
 }
+
+/* ================================================================
+   ======================== BLOQUE COPA ============================
+   ================================================================ */
+
+function processJornada_COPA(){
+  const files = document.getElementById('fileInputJornada').files;
+  if (!files || files.length === 0) return showError('Selecciona un archivo de log de Copa');
+  if (files.length > 1) return showError('Para la Copa solo se puede procesar un archivo');
+  
+  const file = files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target.result;
+      const data = parseLogFileSymbols(content);
+      processedData = [data];
+      
+      displayResults(processedData);
+      document.getElementById('downloadSection').style.display='block';
+      document.getElementById('downloadBtn').disabled = false;
+      currentProcess='jornada';
+      showSuccess('Archivo de Copa procesado correctamente');
+    } catch(err) {
+      showError(`Error al procesar Copa: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ===================== FIN BLOQUE COPA ===================== */
 
 /* ===================== FIN BLOQUE GP ===================== */
 </script>

@@ -1488,124 +1488,152 @@ function buildCopaSheet(ws, data) {
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
-  // Crear layout: equipos a la izquierda, ranking individual a la derecha
-  buildCopaTeamsSection(ws, teams, bestStats);
-  buildCopaRankingSection(ws, allPlayers, teams);
-  
-  // Configurar anchos de columnas
-  ws.columns = [
-    { width: widthFromPx(10) },  // margen
-    { width: widthFromPx(120) }, // nombres equipos
-    { width: widthFromPx(50) },  // puntos equipos
-    { width: widthFromPx(50) },  // scratches equipos
-    { width: widthFromPx(50) },  // palos equipos
-    { width: widthFromPx(50) },  // aces equipos
-    { width: widthFromPx(20) },  // separador
-    { width: widthFromPx(80) },  // equipo individual
-    { width: widthFromPx(120) }, // jugador
-    { width: widthFromPx(40) },  // PU
-    { width: widthFromPx(40) },  // PO
-    { width: widthFromPx(40) },  // SC
-    { width: widthFromPx(40) }   // AC
-  ];
-  
-  // Márgenes
+  // Margen superior
   ws.spliceRows(1, 0, []);
-  ws.addRow([]);
-}
-
-function buildCopaTeamsSection(ws, teams, bestStats) {
+  
   let currentRow = 2;
   
   // Procesar equipos en grupos de 3
   for (let groupStart = 0; groupStart < teams.length; groupStart += 3) {
     const groupTeams = teams.slice(groupStart, groupStart + 3);
-    
-    // Cabeceras para este grupo
-    const headerRow = currentRow;
-    groupTeams.forEach((team, idx) => {
-      const col = 2 + (idx * 4);
-      
-      // Nombre del equipo
-      const teamCell = ws.getCell(headerRow, col);
-      teamCell.value = team.name;
-      teamCell.font = { bold: true, color: { argb: team.colors.fg.replace('#','FF') } };
-      teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
-      teamCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      
-      // Puntos del equipo
-      ws.getCell(headerRow, col + 1).value = team.points;
-      ws.getCell(headerRow, col + 1).font = { bold: true };
-      ws.getCell(headerRow, col + 1).alignment = { horizontal: 'center' };
-      
-      // Headers de estadísticas
-      ws.getCell(headerRow + 1, col).value = 'JUGADOR';
-      ws.getCell(headerRow + 1, col + 1).value = 'PU';
-      ws.getCell(headerRow + 1, col + 2).value = 'PO'; 
-      ws.getCell(headerRow + 1, col + 3).value = 'SC';
-      
-      if (idx === 2 || idx === groupTeams.length - 1) {
-        ws.getCell(headerRow + 1, col + 4).value = 'AC';
-      }
-    });
-    
-    currentRow += 2;
-    
-    // Jugadores (máximo 4 filas)
-    for (let playerRow = 0; playerRow < 4; playerRow++) {
-      groupTeams.forEach((team, teamIdx) => {
-        const col = 2 + (teamIdx * 4);
-        const player = team.players[playerRow];
-        
-        if (player) {
-          // Nombre jugador
-          const nameCell = ws.getCell(currentRow, col);
-          nameCell.value = player.name;
-          nameCell.font = { color: { argb: team.colors.fg.replace('#','FF') } };
-          nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
-          
-          // Estadísticas con destacados en amarillo
-          const pointsCell = ws.getCell(currentRow, col + 1);
-          pointsCell.value = player.points || 0;
-          pointsCell.alignment = { horizontal: 'center' };
-          if ((player.points || 0) === bestStats.points) {
-            pointsCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-            nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-          }
-          
-          const palosCell = ws.getCell(currentRow, col + 2);
-          palosCell.value = player.palos || 0;
-          palosCell.alignment = { horizontal: 'center' };
-          if ((player.palos || 0) === bestStats.palos && bestStats.palos > 0) {
-            palosCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-          }
-          
-          const scratchesCell = ws.getCell(currentRow, col + 3);
-          scratchesCell.value = player.scratches || 0;
-          scratchesCell.alignment = { horizontal: 'center' };
-          if ((player.scratches || 0) === bestStats.scratches && bestStats.scratches > 0) {
-            scratchesCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-          }
-          
-          if (teamIdx === 2 || teamIdx === groupTeams.length - 1) {
-            const acesCell = ws.getCell(currentRow, col + 4);
-            acesCell.value = player.aces || 0;
-            acesCell.alignment = { horizontal: 'center' };
-            if ((player.aces || 0) === bestStats.aces && bestStats.aces > 0) {
-              acesCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-            }
-          }
-        }
-      });
-      currentRow++;
-    }
-    
+    currentRow = buildTeamGroup(ws, groupTeams, bestStats, currentRow);
     currentRow += 2; // Espacio entre grupos
   }
+  
+  // Ranking individual a la derecha
+  buildIndividualRanking(ws, allPlayers, teams);
+  
+  // Configurar anchos
+  ws.columns = [
+    { width: widthFromPx(5) },   // margen
+    { width: widthFromPx(120) }, // nombres
+    { width: widthFromPx(45) },  // puntos
+    { width: widthFromPx(45) },  // scratches  
+    { width: widthFromPx(45) },  // palos
+    { width: widthFromPx(45) },  // aces
+    { width: widthFromPx(120) }, // nombres
+    { width: widthFromPx(45) },  // puntos
+    { width: widthFromPx(45) },  // scratches
+    { width: widthFromPx(45) },  // palos
+    { width: widthFromPx(45) },  // aces
+    { width: widthFromPx(120) }, // nombres
+    { width: widthFromPx(45) },  // puntos
+    { width: widthFromPx(45) },  // scratches
+    { width: widthFromPx(45) },  // palos
+    { width: widthFromPx(45) },  // aces
+    { width: widthFromPx(20) },  // separador
+    { width: widthFromPx(80) },  // equipo individual
+    { width: widthFromPx(120) }, // jugador individual
+    { width: widthFromPx(40) },  // PU
+    { width: widthFromPx(40) },  // PO  
+    { width: widthFromPx(40) },  // SC
+    { width: widthFromPx(40) }   // AC
+  ];
+  
+  ws.addRow([]); // Margen inferior
 }
 
-function buildCopaRankingSection(ws, allPlayers, teams) {
-  const startCol = 8; // Columna H
+function buildTeamGroup(ws, teams, bestStats, startRow) {
+  // Cabeceras de equipos
+  teams.forEach((team, idx) => {
+    const baseCol = 2 + (idx * 5); // 5 columnas por equipo
+    
+    // Nombre del equipo con sus puntos
+    const teamCell = ws.getCell(startRow, baseCol);
+    teamCell.value = team.name;
+    teamCell.font = { bold: true, color: { argb: team.colors.fg.replace('#','FF') } };
+    teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
+    teamCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    
+    // Puntos del equipo
+    const pointsCell = ws.getCell(startRow, baseCol + 1);
+    pointsCell.value = team.points;
+    pointsCell.font = { bold: true };
+    pointsCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  
+  // Headers de estadísticas
+  const headerRow = startRow + 1;
+  teams.forEach((team, idx) => {
+    const baseCol = 2 + (idx * 5);
+    ws.getCell(headerRow, baseCol).value = '';
+    ws.getCell(headerRow, baseCol + 1).value = 'Puntos';
+    ws.getCell(headerRow, baseCol + 2).value = 'Scratches';
+    ws.getCell(headerRow, baseCol + 3).value = 'Palos';
+    ws.getCell(headerRow, baseCol + 4).value = 'Aces';
+    
+    // Estilo headers
+    for (let i = 1; i < 5; i++) {
+      const cell = ws.getCell(headerRow, baseCol + i);
+      cell.font = { bold: false, size: 13 };
+      cell.alignment = { horizontal: 'center', vertical: 'center' };
+      cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+    }
+  });
+  
+  // Datos de jugadores (máximo 4 filas)
+  let currentRow = headerRow + 1;
+  for (let playerRow = 0; playerRow < 4; playerRow++) {
+    teams.forEach((team, teamIdx) => {
+      const baseCol = 2 + (teamIdx * 5);
+      const player = team.players[playerRow];
+      
+      if (player) {
+        // Nombre jugador
+        const nameCell = ws.getCell(currentRow, baseCol);
+        nameCell.value = player.name;
+        nameCell.font = { color: { argb: team.colors.fg.replace('#','FF') } };
+        nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
+        nameCell.alignment = { horizontal: 'left', vertical: 'center' };
+        nameCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        
+        // Puntos
+        const pointsCell = ws.getCell(currentRow, baseCol + 1);
+        pointsCell.value = player.points || 0;
+        pointsCell.alignment = { horizontal: 'center', vertical: 'center' };
+        pointsCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        if ((player.points || 0) === bestStats.points) {
+          pointsCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+          nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+          nameCell.font = { color: { argb: 'FF000000' } }; // Texto negro sobre amarillo
+        }
+        
+        // Scratches
+        const scrCell = ws.getCell(currentRow, baseCol + 2);
+        scrCell.value = player.scratches || 0;
+        scrCell.alignment = { horizontal: 'center', vertical: 'center' };
+        scrCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        if ((player.scratches || 0) === bestStats.scratches && bestStats.scratches > 0) {
+          scrCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        }
+        
+        // Palos
+        const palosCell = ws.getCell(currentRow, baseCol + 3);
+        palosCell.value = player.palos || 0;
+        palosCell.alignment = { horizontal: 'center', vertical: 'center' };
+        palosCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        if ((player.palos || 0) === bestStats.palos && bestStats.palos > 0) {
+          palosCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        }
+        
+        // Aces
+        const acesCell = ws.getCell(currentRow, baseCol + 4);
+        acesCell.value = player.aces || 0;
+        acesCell.alignment = { horizontal: 'center', vertical: 'center' };
+        acesCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        if ((player.aces || 0) === bestStats.aces && bestStats.aces > 0) {
+          acesCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        }
+      }
+    });
+    currentRow++;
+  }
+  
+  return currentRow;
+}
+
+function buildIndividualRanking(ws, allPlayers, teams) {
+  const startCol = 18; // Columna R (después de los equipos)
   let currentRow = 2;
   
   // Headers del ranking individual
@@ -1620,7 +1648,8 @@ function buildCopaRankingSection(ws, allPlayers, teams) {
   for (let i = 0; i < 6; i++) {
     const cell = ws.getCell(currentRow, startCol + i);
     cell.font = { bold: true };
-    cell.alignment = { horizontal: 'center' };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
   }
   
   currentRow++;
@@ -1635,19 +1664,28 @@ function buildCopaRankingSection(ws, allPlayers, teams) {
     teamCell.value = player.team;
     teamCell.font = { color: { argb: colors.fg.replace('#','FF') } };
     teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.bg.replace('#','FF') } };
+    teamCell.alignment = { horizontal: 'left', vertical: 'center' };
+    teamCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     
     // Jugador
-    ws.getCell(currentRow, startCol + 1).value = player.name;
+    const playerCell = ws.getCell(currentRow, startCol + 1);
+    playerCell.value = player.name;
+    playerCell.alignment = { horizontal: 'left', vertical: 'center' };
+    playerCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     
     // Estadísticas
-    ws.getCell(currentRow, startCol + 2).value = player.points || 0;
-    ws.getCell(currentRow, startCol + 3).value = player.palos || 0;
-    ws.getCell(currentRow, startCol + 4).value = player.scratches || 0;
-    ws.getCell(currentRow, startCol + 5).value = player.aces || 0;
+    const stats = [
+      player.points || 0,
+      player.palos || 0, 
+      player.scratches || 0,
+      player.aces || 0
+    ];
     
-    // Centrar números
-    for (let i = 2; i < 6; i++) {
-      ws.getCell(currentRow, startCol + i).alignment = { horizontal: 'center' };
+    for (let i = 0; i < 4; i++) {
+      const cell = ws.getCell(currentRow, startCol + 2 + i);
+      cell.value = stats[i];
+      cell.alignment = { horizontal: 'center', vertical: 'center' };
+      cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     }
     
     currentRow++;

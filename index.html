@@ -1686,11 +1686,11 @@ function buildCopaSheet(ws, data) {
   
   // Configurar anchos
   if (teams.length > 0) {
-    const teamCount = Math.min(teamPair.length, 3); // Hasta 3 equipos por fila
-    const widths = [widthFromPx(20)];
-    for (let i = 0; i < 3; i++) { // Siempre 3 equipos máximo por fila
+    const widths = [widthFromPx(20)]; // margen izquierdo
+    // Configurar para máximo 3 equipos por fila
+    for (let i = 0; i < 3; i++) {
       widths.push(widthFromPx(121), widthFromPx(35), widthFromPx(35), widthFromPx(35), widthFromPx(35));
-      if (i < 2) widths.push(widthFromPx(42)); // Separador entre equipos
+      if (i < 2) widths.push(widthFromPx(42)); // separador entre equipos
     }
     ws.columns = widths.map(w => ({ width: w }));
   }

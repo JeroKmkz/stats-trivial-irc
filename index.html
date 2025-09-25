@@ -1222,7 +1222,7 @@ function buildGPTotalsSheet(ws, data){
   const gpW = widthFromPx(32); // Columnas GP y PAR más anchas
   const bandARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
-  const greenDarkARGB = 'FF4A7C59'; // Verde más claro para TOTAL
+  const greenDarkARGB = 'FF00B050'; // Verde más claro para TOTAL
   const redARGB = 'FFCC0000'; // Rojo para DESC
   
   ws.views = [{ state: 'normal', showGridLines: false }];
@@ -1325,12 +1325,11 @@ function buildGPTotalsSheet(ws, data){
         if (groupIndex < groups.length - 1) {
           const lineRow = currentRow; // Subir una fila (sin +1)
           const separatorStartCol = baseCol + colsPerGroup;
-          for (let sepCol = 0; sepCol < separatorCols; sepCol++) {
-            const lineCell = ws.getCell(lineRow, separatorStartCol + sepCol);
-            lineCell.border = { 
-              bottom: { style: 'thick', color: { argb: 'FF000000' } } 
-            };
-          }
+          // Solo la segunda columna separadora (la de la derecha)
+          const lineCell = ws.getCell(lineRow, separatorStartCol + 1);
+          lineCell.border = { 
+            bottom: { style: 'thick', color: { argb: 'FF000000' } } 
+          };
         }
       }
     });
@@ -1339,9 +1338,8 @@ function buildGPTotalsSheet(ws, data){
     baseCol += colsPerGroup;
     if (groupIndex < groups.length - 1) {
       // Añadir separadores (2 columnas vacías)
-      for (let sep = 0; sep < separatorCols; sep++) {
-        ws.getColumn(baseCol + sep).width = widthFromPx(10);
-      }
+      ws.getColumn(baseCol).width = widthFromPx(10);     // Primera columna separadora
+      ws.getColumn(baseCol + 1).width = widthFromPx(22); // Segunda columna separadora (más ancha para la línea)
       baseCol += separatorCols;
     }
   });

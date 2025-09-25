@@ -1533,7 +1533,6 @@ function buildCopaSheet(ws, data) {
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
-  // Usar el mismo formato que Liga pero procesando de 2 en 2
   let currentRow = 1;
   
   for (let i = 0; i < teams.length; i += 2) {
@@ -1549,6 +1548,44 @@ function buildCopaSheet(ws, data) {
       });
       return totals;
     });
+    
+    // Fila de posiciones (oro, plata, bronce) para los primeros 3 equipos
+    const positionRow = [''];
+    teamPair.forEach((team, idx) => {
+      const globalPosition = i + idx; // Posición global del equipo
+      let positionText = '';
+      let positionColor = '';
+      
+      if (globalPosition === 0) {
+        positionText = '1º';
+        positionColor = 'FFD700'; // Oro
+      } else if (globalPosition === 1) {
+        positionText = '2º'; 
+        positionColor = 'FFC0C0C0'; // Plata
+      } else if (globalPosition === 2) {
+        positionText = '3º';
+        positionColor = 'FFCD7F32'; // Bronce
+      }
+      
+      positionRow.push(positionText, '', '', '', '');
+      if (idx < teamPair.length - 1) positionRow.push(''); // Separador
+    });
+    ws.getRow(currentRow).values = positionRow;
+    
+    // Aplicar formato a las posiciones
+    let col = 2;
+    teamPair.forEach((team, teamIdx) => {
+      const globalPosition = i + teamIdx;
+      if (globalPosition < 3) {
+        const posCell = ws.getCell(currentRow, col);
+        posCell.font = { bold: true, color: { argb: 'FF000000' } };
+        posCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: globalPosition === 0 ? 'FFD700' : (globalPosition === 1 ? 'FFC0C0C0' : 'FFCD7F32') } };
+        posCell.alignment = { horizontal: 'center', vertical: 'center' };
+      }
+      col += (teamIdx < teamPair.length - 1) ? 6 : 5;
+    });
+    
+    currentRow++;
     
     // Fila de headers
     const headerRow = [''];
@@ -1566,20 +1603,20 @@ function buildCopaSheet(ws, data) {
     });
     ws.getRow(currentRow + 1).values = totalsRow;
     
-    // Aplicar formato a headers y totales
-    let col = 2;
+    // Aplicar formato a headers y totales (SIN BORDES)
+    let headerCol = 2;
     teamPair.forEach((team, teamIdx) => {
       // Formato headers
       for (let i = 0; i < 5; i++) {
-        const headerCell = ws.getCell(currentRow, col + i);
+        const headerCell = ws.getCell(currentRow, headerCol + i);
         headerCell.font = { bold: false, size: 13 };
         headerCell.alignment = { horizontal: 'center', vertical: 'center' };
-        headerCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        // Sin bordes
       }
       
       // Formato totales de equipos
       for (let i = 0; i < 5; i++) {
-        const totalCell = ws.getCell(currentRow + 1, col + i);
+        const totalCell = ws.getCell(currentRow + 1, headerCol + i);
         if (i === 0) {
           // Nombre del equipo con colores
           totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: team.colors.bg.replace('#','FF') } };
@@ -1590,10 +1627,10 @@ function buildCopaSheet(ws, data) {
           totalCell.font = { bold: false, size: 12 };
         }
         totalCell.alignment = { horizontal: 'center', vertical: 'center' };
-        totalCell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+        // Sin bordes
       }
       
-      col += (teamIdx < teamPair.length - 1) ? 6 : 5;
+      headerCol += (teamIdx < teamPair.length - 1) ? 6 : 5;
     });
     
     currentRow += 2;
@@ -1608,12 +1645,15 @@ function buildCopaSheet(ws, data) {
       teamPair.forEach((team, teamIdx) => {
         const player = team.players[playerIdx];
         if (player) {
+          // Función para mostrar valor o vacío si es 0
+          const valOrBlank = (v) => (v === 0) ? '' : v;
+          
           playerRow.push(
             player.name,
-            player.points || 0,
-            player.scratches || 0,
-            player.palos || 0,
-            player.aces || 0
+            player.points || 0, // Puntos siempre se muestran, incluso si son 0
+            valOrBlank(player.scratches || 0),
+            valOrBlank(player.palos || 0),
+            valOrBlank(player.aces || 0)
           );
         } else {
           playerRow.push('', '', '', '', '');
@@ -1623,14 +1663,14 @@ function buildCopaSheet(ws, data) {
       
       ws.getRow(currentRow + rowsWritten).values = playerRow;
       
-      // Aplicar formato a jugadores
+      // Aplicar formato a jugadores (SIN BORDES)
       let playerCol = 2;
       teamPair.forEach((team, teamIdx) => {
         const player = team.players[playerIdx];
         if (player) {
           for (let j = 0; j < 5; j++) {
             const cell = ws.getCell(currentRow + rowsWritten, playerCol + j);
-            cell.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+            // Sin bordes
             cell.alignment = { horizontal: j === 0 ? 'left' : 'center', vertical: 'center' };
           }
         }

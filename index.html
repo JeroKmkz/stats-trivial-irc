@@ -1228,6 +1228,8 @@ function buildGPTotalsSheet(ws, data){
   const whiteARGB = 'FFFFFFFF';
   const greenDarkARGB = 'FF00B050'; // Verde más claro para TOTAL
   const redARGB = 'FFCC0000'; // Rojo para DESC
+  const greenClassifiedARGB = 'FF00B050'; // Verde para clasificados directos (mismo que TOTAL)
+  const greenRepescaARGB = 'FF92D050'; // Verde claro para repescados
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
@@ -1280,9 +1282,36 @@ function buildGPTotalsSheet(ws, data){
       };
     }
     
+    // Calcular repescados si estamos en jornada 5+
+    let repescados = [];
+    if (numJornadas >= 5) {
+      // Encontrar jugadores que no están en top 12 pero cumplen criterios de repesca
+      const noClasificados = players.slice(12); // Jugadores del puesto 13 en adelante
+      const candidatosRepesca = noClasificados.filter(player => {
+        const partidasJugadas = player.jornadas.filter(gpp => gpp > 0).length;
+        return partidasJugadas >= 4; // Mínimo 4 partidas
+      });
+      
+      // Ordenar candidatos por TOTAL y tomar máximo 6
+      candidatosRepesca.sort((a, b) => b.total - a.total);
+      repescados = candidatosRepesca.slice(0, 6).map(p => p.name);
+    }
+    
     // Datos de jugadores
     players.forEach((player, playerIndex) => {
       const currentRow = 3 + playerIndex;
+      
+      // Determinar color de fondo para clasificados (solo jornada 5+)
+      let nameBackgroundColor = null;
+      if (numJornadas >= 5) {
+        if (playerIndex < 12) {
+          // Top 12 - clasificados directos
+          nameBackgroundColor = greenClassifiedARGB;
+        } else if (repescados.includes(player.name)) {
+          // Repescados
+          nameBackgroundColor = greenRepescaARGB;
+        }
+      }
       
       // TOTAL
       const totalCell = ws.getCell(currentRow, baseCol);
@@ -1302,10 +1331,15 @@ function buildGPTotalsSheet(ws, data){
       descCell.alignment = { horizontal: 'center', vertical: 'middle' };
       descCell.font = { bold: true, color: { argb: redARGB } };
       
-      // Nombre
+      // Nombre (con color de fondo si está clasificado)
       const nameCell = ws.getCell(currentRow, baseCol + 3);
       nameCell.value = player.name;
       nameCell.alignment = { horizontal: 'left', vertical: 'middle' };
+      if (nameBackgroundColor) {
+        nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: nameBackgroundColor } };
+        // Texto en negro para mejor contraste
+        nameCell.font = { color: { argb: 'FF000000' } };
+      }
       
       // GP1-GP5 (mostrar siempre valores, incluyendo 0)
       for (let i = 0; i < 5; i++){

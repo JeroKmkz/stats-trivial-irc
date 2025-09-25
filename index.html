@@ -1429,7 +1429,7 @@ function processJornada_COPA(){
   reader.onload = (e) => {
     try {
       const content = e.target.result;
-      const data = parseLogFileSymbols(content);
+      const data = parseCopaLogFile(content); // Usar la función específica de Copa
       processedData = [data];
       
       displayResults(processedData);
@@ -1444,6 +1444,68 @@ function processJornada_COPA(){
   reader.readAsText(file);
 }
 
+function parseCopaLogFile(content) {
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  const teamStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION EQUIPOS'));
+  const playerStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION INDIVIDUAL'));
+  if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
+
+  // Extraer equipos y sus puntos
+  const teams = {}, teamOrder = [];
+  for (let i = teamStart + 1; i < playerStart; i++) {
+    const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    const team = m[1].trim();
+    const points = parseInt(m[2], 10);
+    teams[team] = points;
+    teamOrder.push(team);
+  }
+
+  // Extraer jugadores
+  const players = [];
+  for (let i = playerStart + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) continue;
+    const name = parts[0];
+    const points = parseInt(parts[1], 10);
+    players.push({
+      name: name.toUpperCase(),
+      points: line.toUpperCase().includes('NO ESTUVO PRESENTE') ? null : points,
+      aces: parseInt((line.match(/Aces:\s*(\d+)/i) || [0, 0])[1], 10),
+      scratches: parseInt((line.match(/Scr:\s*(\d+)/i) || [0, 0])[1], 10),
+      palos: parseInt((line.match(/Palos:\s*(\d+)/i) || [0, 0])[1], 10),
+      absent: line.toUpperCase().includes('NO ESTUVO PRESENTE')
+    });
+  }
+
+  // Asignar jugadores a equipos usando orden alfabético
+  const teamsAlpha = Object.keys(teams).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  
+  if (players.length > 0) {
+    let currentTeamIndex = 0;
+    let prevNick = '';
+    
+    for (let i = 0; i < players.length; i++) {
+      const curr = players[i];
+      
+      // Si el nombre actual es alfabéticamente menor que el anterior, cambiar de equipo
+      if (i > 0 && curr.name.localeCompare(prevNick, 'es', { sensitivity: 'base' }) < 0) {
+        currentTeamIndex++;
+        if (currentTeamIndex >= teamsAlpha.length) {
+          currentTeamIndex = teamsAlpha.length - 1; // No exceder el número de equipos
+        }
+      }
+      
+      curr.team = teamsAlpha[currentTeamIndex] || 'SinEquipo';
+      prevNick = curr.name;
+    }
+  }
+
+  return { teams, teamOrder, players };
+}
+  
 async function downloadExcel_COPA(){
   if (!processedData || processedData.length === 0) return showError('No hay datos procesados de Copa');
   

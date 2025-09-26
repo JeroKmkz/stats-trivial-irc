@@ -1702,14 +1702,14 @@ function buildCopaSheet(ws, data) {
     widths.push(widthFromPx(35));  // AC
     
     ws.columns = widths.map(w => ({ width: w }));
-}
+  }
+
+  // Añadir ranking individual a la derecha
+  addIndividualRanking(ws, allPlayers, teams);
   
   ws.spliceRows(1, 0, []);
   ws.addRow([]);
 }
-
-// Añadir ranking individual a la derecha
-addIndividualRanking(ws, allPlayers, teams);
 
 function addIndividualRanking(ws, allPlayers, teams) {
   // Top 20 jugadores por puntos
@@ -1717,7 +1717,7 @@ function addIndividualRanking(ws, allPlayers, teams) {
     .sort((a,b) => (b.points||0) - (a.points||0))
     .slice(0, 20);
   
-  const startCol = 19; // 2 columnas de separación después de los equipos (3x5 + 2 separadores + 2 espacios)
+  const startCol = 19; // Columna S (después de los 3 equipos + separadores)
   let currentRow = 2;
   
   // Headers del ranking

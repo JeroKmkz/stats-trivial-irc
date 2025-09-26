@@ -1690,11 +1690,80 @@ function buildCopaSheet(ws, data) {
       widths.push(widthFromPx(121), widthFromPx(35), widthFromPx(35), widthFromPx(35), widthFromPx(35));
       if (i < 2) widths.push(widthFromPx(42)); // separador entre equipos
     }
+    
+    // Separación y ranking individual
+    widths.push(widthFromPx(20)); // separación
+    widths.push(widthFromPx(20)); // separación adicional
+    widths.push(widthFromPx(80));  // EQUIPO
+    widths.push(widthFromPx(120)); // JUGADOR
+    widths.push(widthFromPx(35));  // PU
+    widths.push(widthFromPx(35));  // PO
+    widths.push(widthFromPx(35));  // SC
+    widths.push(widthFromPx(35));  // AC
+    
     ws.columns = widths.map(w => ({ width: w }));
-  }
+}
   
   ws.spliceRows(1, 0, []);
   ws.addRow([]);
+}
+
+// Añadir ranking individual a la derecha
+addIndividualRanking(ws, allPlayers, teams);
+
+function addIndividualRanking(ws, allPlayers, teams) {
+  // Top 20 jugadores por puntos
+  const topPlayers = allPlayers
+    .sort((a,b) => (b.points||0) - (a.points||0))
+    .slice(0, 20);
+  
+  const startCol = 19; // 2 columnas de separación después de los equipos (3x5 + 2 separadores + 2 espacios)
+  let currentRow = 2;
+  
+  // Headers del ranking
+  const headers = ['EQUIPO', 'JUGADOR', 'PU', 'PO', 'SC', 'AC'];
+  headers.forEach((header, i) => {
+    const cell = ws.getCell(currentRow, startCol + i);
+    cell.value = header;
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  
+  currentRow++;
+  
+  // Datos de jugadores
+  topPlayers.forEach(player => {
+    const team = teams.find(t => t.name === player.team);
+    const teamColors = team ? team.colors : { bg: '#CCCCCC', fg: '#000000' };
+    
+    // Equipo con colores
+    const teamCell = ws.getCell(currentRow, startCol);
+    teamCell.value = player.team;
+    teamCell.font = { color: { argb: teamColors.fg.replace('#','FF') } };
+    teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
+    teamCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+    // Jugador
+    const playerCell = ws.getCell(currentRow, startCol + 1);
+    playerCell.value = player.name;
+    playerCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    
+    // Estadísticas: PU, PO, SC, AC
+    const stats = [
+      player.points || 0,
+      player.palos || 0, 
+      player.scratches || 0,
+      player.aces || 0
+    ];
+    
+    stats.forEach((stat, i) => {
+      const cell = ws.getCell(currentRow, startCol + 2 + i);
+      cell.value = stat;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+    
+    currentRow++;
+  });
 }
 
 function buildTeamGroup(ws, teams, bestStats, startRow) {

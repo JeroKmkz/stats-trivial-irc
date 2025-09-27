@@ -1986,17 +1986,20 @@ function parseMasterLogFile(content) {
   const playerStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION INDIVIDUAL'));
   if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
 
-  // Extraer equipos - convertir números a números romanos
-  const teams = {}, teamOrder = [];
+  // Extraer equipos con sus puntuaciones originales
+  const teams = {}, teamOrder = [], originalTeamScores = {};
   for (let i = teamStart + 1; i < playerStart; i++) {
     const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
     if (!m) continue;
     let teamName = m[1].trim();
+    const points = parseInt(m[2], 10);
+    
+    // Guardar puntuación original antes de convertir nombres
+    originalTeamScores[teamName] = points;
     
     // Convertir "1" y "2" a "I" y "II"
     teamName = teamName.replace(/\s+1$/, ' I').replace(/\s+2$/, ' II');
     
-    const points = parseInt(m[2], 10);
     teams[teamName] = points;
     teamOrder.push(teamName);
   }
@@ -2020,7 +2023,7 @@ function parseMasterLogFile(content) {
     });
   }
 
-  // Asignar jugadores a equipos - máximo 2 por equipo
+  // Asignación inicial con lógica alfabética (como antes)
   const teamsAlpha = Object.keys(teams).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
   
   if (players.length > 0) {
@@ -2031,7 +2034,6 @@ function parseMasterLogFile(content) {
     for (let i = 0; i < players.length; i++) {
       const curr = players[i];
       
-      // Si el nombre es alfabéticamente menor o ya hay 2 jugadores en el equipo actual
       if ((i > 0 && curr.name.localeCompare(prevNick, 'es', { sensitivity: 'base' }) < 0) || 
           playersInCurrentTeam >= 2) {
         currentTeamIndex++;
@@ -2047,9 +2049,86 @@ function parseMasterLogFile(content) {
     }
   }
 
+  // Validar y corregir asignaciones usando puntuaciones
+  validateAndCorrectMasterAssignments(players, teams, originalTeamScores);
+
   return { teams, teamOrder, players };
 }
 
+function validateAndCorrectMasterAssignments(players, teams, originalTeamScores) {
+  // Agrupar jugadores por equipo base
+  const teamGroups = {};
+  players.forEach(player => {
+    if (player.absent) return;
+    const baseTeam = player.team.replace(/\s+(I|II)$/, '');
+    if (!teamGroups[baseTeam]) teamGroups[baseTeam] = [];
+    teamGroups[baseTeam].push(player);
+  });
+
+  // Para cada equipo base, validar asignaciones
+  Object.keys(teamGroups).forEach(baseTeam => {
+    const teamPlayers = teamGroups[baseTeam];
+    if (teamPlayers.length < 2) return; // Skip equipos con pocos jugadores
+    
+    const team1Name = baseTeam + ' I';
+    const team2Name = baseTeam + ' II';
+    const team1Score = teams[team1Name];
+    const team2Score = teams[team2Name];
+    
+    if (!team1Score && !team2Score) return; // Skip si no hay subequipos
+    
+    // Verificar si la asignación actual es correcta
+    const currentTeam1Players = teamPlayers.filter(p => p.team === team1Name);
+    const currentTeam2Players = teamPlayers.filter(p => p.team === team2Name);
+    
+    const currentTeam1Sum = currentTeam1Players.reduce((sum, p) => sum + (p.points || 0), 0);
+    const currentTeam2Sum = currentTeam2Players.reduce((sum, p) => sum + (p.points || 0), 0);
+    
+    // Si la asignación actual es correcta, no hacer nada
+    if (currentTeam1Sum === team1Score && currentTeam2Sum === team2Score) return;
+    
+    // Buscar combinación correcta
+    const correctAssignment = findCorrectMasterCombination(teamPlayers, team1Score, team2Score, team1Name, team2Name);
+    
+    if (correctAssignment) {
+      // Aplicar la asignación correcta
+      correctAssignment.team1.forEach(player => player.team = team1Name);
+      correctAssignment.team2.forEach(player => player.team = team2Name);
+    } else {
+      // No se encontró solución única - mostrar aviso
+      console.warn(`No se pudo determinar automáticamente la asignación para ${baseTeam}. Usando asignación alfabética.`);
+      alert(`Atención: No se pudo determinar automáticamente la asignación de jugadores para ${baseTeam}. Se usará la asignación alfabética por defecto.`);
+    }
+  });
+}
+
+function findCorrectMasterCombination(teamPlayers, team1Score, team2Score, team1Name, team2Name) {
+  const n = teamPlayers.length;
+  const validCombinations = [];
+  
+  // Generar todas las combinaciones posibles
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const team1Combo = [teamPlayers[i], teamPlayers[j]];
+      const team2Combo = teamPlayers.filter((_, idx) => idx !== i && idx !== j);
+      
+      const sum1 = team1Combo.reduce((sum, p) => sum + (p.points || 0), 0);
+      const sum2 = team2Combo.reduce((sum, p) => sum + (p.points || 0), 0);
+      
+      if (sum1 === team1Score && sum2 === team2Score) {
+        validCombinations.push({ team1: team1Combo, team2: team2Combo });
+      }
+    }
+  }
+  
+  // Si hay exactamente una combinación válida, usarla
+  if (validCombinations.length === 1) {
+    return validCombinations[0];
+  }
+  
+  // Si hay 0 o múltiples combinaciones, retornar null para usar asignación por defecto
+  return null;
+}
 async function downloadExcel_MASTER(){
   if (!processedData || processedData.length === 0) return showError('No hay datos procesados de Máster');
   

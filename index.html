@@ -1718,7 +1718,7 @@ function addIndividualRanking(ws, allPlayers, teams) {
     .slice(0, 20);
   
   const startCol = 19; // Columna S (después de los 3 equipos + separadores)
-  let currentRow = 2;
+  let currentRow = 2;  
   
   // Headers del ranking
   const headers = ['EQUIPO', 'JUGADOR', 'PU', 'PO', 'SC', 'AC'];
@@ -1758,7 +1758,8 @@ function addIndividualRanking(ws, allPlayers, teams) {
     
     stats.forEach((stat, i) => {
       const cell = ws.getCell(currentRow, startCol + 2 + i);
-      cell.value = stat;
+      // Solo mostrar valores > 0, excepto para PU (puntos) que siempre se muestra
+      cell.value = (i === 0 || stat > 0) ? stat : '';
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
     

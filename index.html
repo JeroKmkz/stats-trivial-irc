@@ -1704,21 +1704,21 @@ function buildCopaSheet(ws, data) {
     ws.columns = widths.map(w => ({ width: w }));
   }
 
-  // Añadir ranking individual a la derecha
-  addIndividualRanking(ws, allPlayers, teams);
+  // Añadir ranking individual a la derecha (empezar en fila 1)
+  addIndividualRanking(ws, allPlayers, teams, 1);
   
   ws.spliceRows(1, 0, []);
   ws.addRow([]);
 }
 
-function addIndividualRanking(ws, allPlayers, teams) {
+function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
   // Top 20 jugadores por puntos
   const topPlayers = allPlayers
     .sort((a,b) => (b.points||0) - (a.points||0))
     .slice(0, 20);
   
-  const startCol = 19; // Columna S (después de los 3 equipos + separadores)
-  let currentRow = 2;  
+  const startCol = 21; // 2 columnas más a la derecha
+  let currentRow = startRowParam; // Usar el parámetro pasado
   
   // Headers del ranking
   const headers = ['EQUIPO', 'JUGADOR', 'PU', 'PO', 'SC', 'AC'];

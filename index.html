@@ -38,7 +38,7 @@
         <option value="gp">GP</option>
         <option value="copa">Copa</option>
         <option value="relevos" disabled>Torneo Relevos (próx.)</option>
-        <option value="master" disabled>Máster por Equipos (próx.)</option>
+        <option value="master">Máster por Equipos</option>
         <option value="posiciones" disabled>Torneo Posiciones (próx.)</option>
       </select>
 
@@ -111,9 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
   inJ.addEventListener('change', () => {
     const hasFiles = inJ.files && inJ.files.length;
     
-    // Para Copa, solo permitir 1 archivo
-    if (competitionType === 'copa' && hasFiles && inJ.files.length > 1) {
-      showError('Para la Copa solo se puede procesar un archivo');
+    // Para Copa y Máster, solo permitir 1 archivo
+    if ((competitionType === 'copa' || competitionType === 'master') && hasFiles && inJ.files.length > 1) {
+      showError('Para la Copa y Máster solo se puede procesar un archivo');
       bJ.disabled = true;
       return;
     }
@@ -130,14 +130,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Botones
   bJ.addEventListener('click', () => {
-  if (competitionType === 'gp') {
-    processJornada_GP();
-  } else if (competitionType === 'copa') {
-    processJornada_COPA();
-  } else {
-    processJornada_LIGA();
-  }
-});
+    if (competitionType === 'gp') {
+      processJornada_GP();
+    } else if (competitionType === 'copa') {
+      processJornada_COPA();
+    } else if (competitionType === 'master') {
+      processJornada_MASTER();
+    } else {
+      processJornada_LIGA();
+    }
+  });
   bT.addEventListener('click', () => (competitionType==='gp' ? processTotales_GP() : processTotales_LIGA()));
   bD.addEventListener('click', () => {
     if (competitionType === 'gp') {
@@ -148,6 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } else if (competitionType === 'copa') {
       downloadExcel_COPA();
+    } else if (competitionType === 'master') {
+      downloadExcel_MASTER();
     } else {
       downloadExcel_LIGA();
     }
@@ -175,6 +179,10 @@ function onCompetitionChange(){
     title.textContent = '🏆 Final de Copa';
     desc.textContent = 'Sube el Excel (.xlsx) de la Copa para generar estadísticas finales';
     btn.textContent = 'Generar Final Copa';
+  } else if (competitionType === 'master') {
+    title.textContent = '🏆 Máster por Equipos';
+    desc.textContent = 'Sube el log (.txt) del Máster por Equipos para generar estadísticas';
+    btn.textContent = 'Generar Máster';
   } else {
     title.textContent = '🏆 Totales y Medias Liga';
     desc.textContent = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
@@ -188,7 +196,7 @@ function onCompetitionChange(){
 
   // Botón Totales habilitado en Liga y GP, deshabilitado en Copa
   const inT = document.getElementById('fileInputTotales');
-  if (competitionType === 'copa') {
+  if (competitionType === 'copa' || competitionType === 'master') {
     document.getElementById('processTotalesBtn').disabled = true;
     document.getElementById('processTotalesBtn').style.opacity = '0.5';
   } else {
@@ -1941,6 +1949,126 @@ function buildIndividualRanking(ws, allPlayers, teams) {
     currentRow++;
   });
 }
+
+/* ================================================================
+   ======================== BLOQUE MASTER ==========================
+   ================================================================ */
+
+function processJornada_MASTER(){
+  const files = document.getElementById('fileInputJornada').files;
+  if (!files || files.length === 0) return showError('Selecciona un archivo de log de Máster');
+  if (files.length > 1) return showError('Para el Máster solo se puede procesar un archivo');
+  
+  const file = files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target.result;
+      const data = parseMasterLogFile(content);
+      processedData = [data];
+      
+      displayResults(processedData);
+      document.getElementById('downloadSection').style.display='block';
+      document.getElementById('downloadBtn').disabled = false;
+      currentProcess='jornada';
+      showSuccess('Archivo de Máster procesado correctamente');
+    } catch(err) {
+      showError(`Error al procesar Máster: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseMasterLogFile(content) {
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  const teamStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION EQUIPOS'));
+  const playerStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION INDIVIDUAL'));
+  if (teamStart === -1 || playerStart === -1) throw new Error('Secciones no encontradas');
+
+  // Extraer equipos - convertir números a números romanos
+  const teams = {}, teamOrder = [];
+  for (let i = teamStart + 1; i < playerStart; i++) {
+    const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    let teamName = m[1].trim();
+    
+    // Convertir "1" y "2" a "I" y "II"
+    teamName = teamName.replace(/\s+1$/, ' I').replace(/\s+2$/, ' II');
+    
+    const points = parseInt(m[2], 10);
+    teams[teamName] = points;
+    teamOrder.push(teamName);
+  }
+
+  // Extraer jugadores
+  const players = [];
+  for (let i = playerStart + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) continue;
+    const name = parts[0];
+    const points = parseInt(parts[1], 10);
+    players.push({
+      name: name.toUpperCase(),
+      points: line.toUpperCase().includes('NO ESTUVO PRESENTE') ? null : points,
+      aces: parseInt((line.match(/Aces:\s*(\d+)/i) || [0, 0])[1], 10),
+      scratches: parseInt((line.match(/Scr:\s*(\d+)/i) || [0, 0])[1], 10),
+      palos: parseInt((line.match(/Palos:\s*(\d+)/i) || [0, 0])[1], 10),
+      absent: line.toUpperCase().includes('NO ESTUVO PRESENTE')
+    });
+  }
+
+  // Asignar jugadores a equipos - máximo 2 por equipo
+  const teamsAlpha = Object.keys(teams).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  
+  if (players.length > 0) {
+    let currentTeamIndex = 0;
+    let playersInCurrentTeam = 0;
+    let prevNick = '';
+    
+    for (let i = 0; i < players.length; i++) {
+      const curr = players[i];
+      
+      // Si el nombre es alfabéticamente menor o ya hay 2 jugadores en el equipo actual
+      if ((i > 0 && curr.name.localeCompare(prevNick, 'es', { sensitivity: 'base' }) < 0) || 
+          playersInCurrentTeam >= 2) {
+        currentTeamIndex++;
+        playersInCurrentTeam = 0;
+        if (currentTeamIndex >= teamsAlpha.length) {
+          currentTeamIndex = teamsAlpha.length - 1;
+        }
+      }
+      
+      curr.team = teamsAlpha[currentTeamIndex] || 'SinEquipo';
+      playersInCurrentTeam++;
+      prevNick = curr.name;
+    }
+  }
+
+  return { teams, teamOrder, players };
+}
+
+async function downloadExcel_MASTER(){
+  if (!processedData || processedData.length === 0) return showError('No hay datos procesados de Máster');
+  
+  const wb = new ExcelJS.Workbook();
+  wb.created = new Date();
+  
+  const ws = wb.addWorksheet('Master Equipos', { views:[{ state:'normal', showGridLines:false }] });
+  buildMasterSheet(ws, processedData[0]);
+  
+  const uint8 = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `Master_Equipos.xlsx`);
+  showSuccess('Excel Máster generado correctamente.');
+}
+
+function buildMasterSheet(ws, data) {
+  // Reutilizar la misma lógica que Copa pero con máximo 2 jugadores por equipo
+  buildCopaSheet(ws, data);
+}
+
+/* ===================== FIN BLOQUE MASTER ===================== */
   
 /* ===================== FIN BLOQUE COPA ===================== */
 

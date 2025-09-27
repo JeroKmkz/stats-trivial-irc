@@ -2013,115 +2013,285 @@ function parseMasterLogFile(content) {
     players.push({
       name: name.toUpperCase(),
       points: line.toUpperCase().includes('NO ESTUVO PRESENTE') ? null : points,
-      aces: parseInt((line.match(/Aces:\s*(\d+)/i) || [0, 0])[1], 10),
-      scratches: parseInt((line.match(/Scr:\s*(\d+)/i) || [0, 0])[1], 10),
-      palos: parseInt((line.match(/Palos:\s*(\d+)/i) || [0, 0])[1], 10),
+      aces: parseInt((line.match(/Aces:\s*(\d+)/i) || [0,0])[1], 10),
+      scratches: parseInt((line.match(/Scr:\s*(\d+)/i) || [0,0])[1], 10),
+      palos: parseInt((line.match(/Palos:\s*(\d+)/i) || [0,0])[1], 10),
       absent: line.toUpperCase().includes('NO ESTUVO PRESENTE')
     });
   }
 
-  // PASO 1: Agrupar jugadores por equipo base usando método alfabético
-  const presentPlayers = players.filter(p => !p.absent);
-  const teamGroups = {};
+  // Asignar jugadores a equipos usando la nueva lógica sistemática
+  const unassignedPlayers = assignPlayersToTeamsSystematic(players, teams);
   
-  // Obtener equipos base únicos
-  const baseTeams = [...new Set(Object.keys(teams).map(t => t.replace(/\s+(I|II)$/, '')))];
-  baseTeams.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-  
-  // Asignar jugadores a equipos base por orden alfabético
-  let playerIndex = 0;
-  baseTeams.forEach(baseTeam => {
-    teamGroups[baseTeam] = [];
-    let prevNick = '';
-    
-    while (playerIndex < presentPlayers.length) {
-      const player = presentPlayers[playerIndex];
-      
-      // Si es el primer jugador del equipo o el nombre sigue el orden alfabético
-      if (teamGroups[baseTeam].length === 0 || 
-          player.name.localeCompare(prevNick, 'es', { sensitivity: 'base' }) >= 0) {
-        teamGroups[baseTeam].push(player);
-        prevNick = player.name;
-        playerIndex++;
-      } else {
-        // Salto hacia atrás en alfabeto = cambio de equipo
-        break;
-      }
-    }
-  });
-
-  // PASO 2: Para cada equipo base, asignar a subequipos I y II
-  Object.keys(teamGroups).forEach(baseTeam => {
-    const teamPlayers = teamGroups[baseTeam];
-    const team1Name = baseTeam + ' I';
-    const team2Name = baseTeam + ' II';
-    const team1Score = teams[team1Name];
-    const team2Score = teams[team2Name];
-    
-    if (teamPlayers.length === 0) return;
-    
-    // Si solo hay un subequipo, asignar todos ahí
-    if (team1Score && !team2Score) {
-      teamPlayers.forEach(p => p.team = team1Name);
-    } else if (!team1Score && team2Score) {
-      teamPlayers.forEach(p => p.team = team2Name);
-    } else if (team1Score && team2Score) {
-      // Buscar combinación correcta de puntuaciones
-      const correctAssignment = findCorrectMasterCombination(
-        teamPlayers, team1Score, team2Score, team1Name, team2Name
-      );
-      
-      if (correctAssignment) {
-        correctAssignment.team1.forEach(p => p.team = team1Name);
-        correctAssignment.team2.forEach(p => p.team = team2Name);
-      } else {
-        // Fallback: asignar por orden (primeros 2 al I, resto al II)
-        console.warn(`No se pudo resolver automáticamente ${baseTeam}, usando asignación por orden`);
-        teamPlayers.forEach((p, idx) => {
-          p.team = idx < 2 ? team1Name : team2Name;
-        });
-      }
-    }
-  });
+  // Si hay jugadores sin asignar, mostrar opciones para asignación manual
+  if (unassignedPlayers.length > 0) {
+    handleUnassignedPlayers(unassignedPlayers, teams);
+  }
 
   return { teams, teamOrder, players };
 }
 
-function findCorrectMasterCombination(teamPlayers, team1Score, team2Score, team1Name, team2Name) {
-  if (teamPlayers.length < 2) return null;
+function assignPlayersToTeamsSystematic(players, teams) {
+  // Obtener equipos base (sin subequipos) en orden alfabético
+  const baseTeams = getBaseTeamsAlphabetical(teams);
+  console.log('Equipos base detectados:', baseTeams);
   
-  const validCombinations = [];
+  // Ordenar jugadores alfabéticamente para detectar cambios de equipo
+  const sortedPlayers = [...players].sort((a, b) => 
+    a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+  );
   
-  // Si hay exactamente 2 jugadores, solo una combinación posible
-  if (teamPlayers.length === 2) {
-    const sum = teamPlayers[0].points + teamPlayers[1].points;
-    if (sum === team1Score) {
-      return { team1: [teamPlayers[0], teamPlayers[1]], team2: [] };
-    } else if (sum === team2Score) {
-      return { team1: [], team2: [teamPlayers[0], teamPlayers[1]] };
+  let currentPlayerIndex = 0;
+  const unassignedPlayers = [];
+  
+  // Procesar cada equipo base en orden alfabético
+  for (const baseTeam of baseTeams) {
+    console.log(`\nProcesando equipo: ${baseTeam}`);
+    
+    // Determinar subequipos para este equipo base
+    const subteams = getSubteamsForBase(baseTeam, teams);
+    console.log(`Subequipos encontrados:`, subteams);
+    
+    // Determinar máximo de jugadores permitidos
+    const maxPlayers = subteams.length * 2;
+    console.log(`Máximo jugadores permitidos: ${maxPlayers}`);
+    
+    // Recopilar jugadores candidatos (consecutivos alfabéticamente)
+    const candidatePlayers = [];
+    let tempIndex = currentPlayerIndex;
+    
+    while (tempIndex < sortedPlayers.length && candidatePlayers.length < maxPlayers) {
+      const player = sortedPlayers[tempIndex];
+      
+      // Si ya hay jugadores y hay un salto alfabético, parar
+      if (candidatePlayers.length > 0 && 
+          player.name.localeCompare(candidatePlayers[candidatePlayers.length - 1].name, 'es', { sensitivity: 'base' }) < 0) {
+        console.log(`Salto alfabético detectado en ${player.name}, cambiando de equipo`);
+        break;
+      }
+      
+      candidatePlayers.push(player);
+      tempIndex++;
     }
-    return null;
+    
+    console.log(`Jugadores candidatos para ${baseTeam}:`, candidatePlayers.map(p => `${p.name}(${p.points})`));
+    
+    // Asignar jugadores a subequipos
+    const assigned = assignCandidatesToSubteams(candidatePlayers, subteams, teams);
+    
+    if (assigned.success) {
+      console.log(`Asignación exitosa para ${baseTeam}`);
+      currentPlayerIndex = tempIndex;
+    } else {
+      console.log(`No se pudo asignar automáticamente para ${baseTeam}`);
+      // Agregar jugadores no asignados a la lista
+      unassignedPlayers.push(...assigned.unassigned);
+      currentPlayerIndex = tempIndex;
+    }
   }
   
-  // Para más de 2 jugadores, probar todas las combinaciones de 2+resto
-  for (let i = 0; i < teamPlayers.length; i++) {
-    for (let j = i + 1; j < teamPlayers.length; j++) {
-      const combo1 = [teamPlayers[i], teamPlayers[j]];
-      const combo2 = teamPlayers.filter((_, idx) => idx !== i && idx !== j);
+  // Verificar si quedan jugadores sin procesar
+  if (currentPlayerIndex < sortedPlayers.length) {
+    const remaining = sortedPlayers.slice(currentPlayerIndex);
+    console.log('Jugadores restantes sin procesar:', remaining.map(p => p.name));
+    unassignedPlayers.push(...remaining);
+  }
+  
+  return unassignedPlayers;
+}
+
+function getBaseTeamsAlphabetical(teams) {
+  const baseTeams = new Set();
+  
+  for (const teamName of Object.keys(teams)) {
+    // Extraer equipo base removiendo " I" o " II"
+    const baseTeam = teamName.replace(/\s+(I|II)$/, '');
+    baseTeams.add(baseTeam);
+  }
+  
+  return Array.from(baseTeams).sort((a, b) => 
+    a.localeCompare(b, 'es', { sensitivity: 'base' })
+  );
+}
+
+function getSubteamsForBase(baseTeam, teams) {
+  const subteams = [];
+  
+  // Buscar subequipos I y II
+  if (teams[`${baseTeam} I`] !== undefined) {
+    subteams.push(`${baseTeam} I`);
+  }
+  if (teams[`${baseTeam} II`] !== undefined) {
+    subteams.push(`${baseTeam} II`);
+  }
+  
+  // Si no se encontraron subequipos con I/II, buscar el equipo base directo
+  if (subteams.length === 0 && teams[baseTeam] !== undefined) {
+    subteams.push(baseTeam);
+  }
+  
+  return subteams;
+}
+
+function assignCandidatesToSubteams(candidates, subteams, teams) {
+  if (candidates.length === 0) {
+    return { success: true, unassigned: [] };
+  }
+  
+  // Caso 1: Solo un subequipo, máximo 2 jugadores
+  if (subteams.length === 1) {
+    if (candidates.length <= 2) {
+      // Asignar todos al único subequipo
+      candidates.forEach(player => {
+        player.team = subteams[0];
+      });
+      return { success: true, unassigned: [] };
+    } else {
+      // Solo los primeros 2, el resto no asignado
+      candidates.slice(0, 2).forEach(player => {
+        player.team = subteams[0];
+      });
+      return { success: false, unassigned: candidates.slice(2) };
+    }
+  }
+  
+  // Caso 2: Dos subequipos, encontrar combinación correcta
+  if (subteams.length === 2) {
+    const team1Score = teams[subteams[0]];
+    const team2Score = teams[subteams[1]];
+    
+    const combination = findOptimalCombination(candidates, team1Score, team2Score);
+    
+    if (combination) {
+      // Asignar jugadores según la combinación encontrada
+      combination.team1.forEach(player => {
+        player.team = subteams[0];
+      });
+      combination.team2.forEach(player => {
+        player.team = subteams[1];
+      });
       
-      const sum1 = combo1.reduce((sum, p) => sum + (p.points || 0), 0);
-      const sum2 = combo2.reduce((sum, p) => sum + (p.points || 0), 0);
+      return { success: true, unassigned: combination.unassigned || [] };
+    } else {
+      console.log(`No se encontró combinación válida para ${subteams[0]} (${team1Score}) y ${subteams[1]} (${team2Score})`);
+      return { success: false, unassigned: candidates };
+    }
+  }
+  
+  return { success: false, unassigned: candidates };
+}
+
+function findOptimalCombination(players, team1Score, team2Score) {
+  const totalPlayers = players.length;
+  
+  // Probar todas las combinaciones posibles
+  for (let i = 0; i < Math.pow(2, totalPlayers); i++) {
+    const team1 = [];
+    const team2 = [];
+    
+    for (let j = 0; j < totalPlayers; j++) {
+      if (i & (1 << j)) {
+        team1.push(players[j]);
+      } else {
+        team2.push(players[j]);
+      }
+    }
+    
+    // Verificar si cada equipo tiene máximo 2 jugadores
+    if (team1.length <= 2 && team2.length <= 2) {
+      const sum1 = team1.reduce((sum, p) => sum + (p.points || 0), 0);
+      const sum2 = team2.reduce((sum, p) => sum + (p.points || 0), 0);
       
       if (sum1 === team1Score && sum2 === team2Score) {
-        validCombinations.push({ team1: combo1, team2: combo2 });
-      } else if (sum1 === team2Score && sum2 === team1Score) {
-        validCombinations.push({ team1: combo2, team2: combo1 });
+        console.log(`Combinación encontrada: ${team1.map(p => p.name)} = ${sum1}, ${team2.map(p => p.name)} = ${sum2}`);
+        return { team1, team2 };
       }
     }
   }
   
-  return validCombinations.length === 1 ? validCombinations[0] : null;
+  return null;
 }
+
+function handleUnassignedPlayers(unassignedPlayers, teams) {
+  // Crear interfaz para asignación manual
+  const container = document.createElement('div');
+  container.id = 'unassignedPlayersModal';
+  container.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+  `;
+  
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white; padding: 30px; border-radius: 10px; max-width: 600px; width: 90%;
+    max-height: 80%; overflow-y: auto;
+  `;
+  
+  modal.innerHTML = `
+    <h3>⚠️ Asignación Manual Requerida</h3>
+    <p>No se pudo asignar automáticamente los siguientes jugadores:</p>
+    <div id="playerAssignments"></div>
+    <div style="margin-top: 20px; text-align: right;">
+      <button id="confirmAssignments" class="button">Confirmar Asignaciones</button>
+      <button id="cancelAssignments" class="button" style="background-color: #6c757d; margin-left: 10px;">Cancelar</button>
+    </div>
+  `;
+  
+  const assignmentsDiv = modal.querySelector('#playerAssignments');
+  
+  // Crear selector para cada jugador no asignado
+  unassignedPlayers.forEach((player, index) => {
+    const playerDiv = document.createElement('div');
+    playerDiv.style.cssText = 'margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;';
+    
+    const teamOptions = Object.keys(teams).map(team => 
+      `<option value="${team}">${team}</option>`
+    ).join('');
+    
+    playerDiv.innerHTML = `
+      <div style="margin-bottom: 10px;">
+        <strong>${player.name}</strong> - ${player.points} puntos
+      </div>
+      <select id="teamSelect_${index}" style="width: 100%; padding: 5px;">
+        <option value="">Seleccionar equipo...</option>
+        ${teamOptions}
+      </select>
+    `;
+    
+    assignmentsDiv.appendChild(playerDiv);
+  });
+  
+  container.appendChild(modal);
+  document.body.appendChild(container);
+  
+  // Configurar eventos
+  modal.querySelector('#confirmAssignments').onclick = () => {
+    let allAssigned = true;
+    
+    unassignedPlayers.forEach((player, index) => {
+      const select = document.getElementById(`teamSelect_${index}`);
+      if (select.value) {
+        player.team = select.value;
+      } else {
+        allAssigned = false;
+      }
+    });
+    
+    if (allAssigned) {
+      document.body.removeChild(container);
+      showSuccess('Todos los jugadores han sido asignados correctamente');
+    } else {
+      showError('Por favor, asigna todos los jugadores a un equipo');
+    }
+  };
+  
+  modal.querySelector('#cancelAssignments').onclick = () => {
+    document.body.removeChild(container);
+    showError('Procesamiento cancelado por el usuario');
+  };
+}
+  
 async function downloadExcel_MASTER(){
   if (!processedData || processedData.length === 0) return showError('No hay datos procesados de Máster');
   

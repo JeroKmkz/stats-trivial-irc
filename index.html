@@ -1547,7 +1547,7 @@ function buildCopaSheet(ws, data) {
         
         return (b.palos||0) - (a.palos||0);
       }),
-    colors: COLORES_EQUIPOS[teamName] || { bg:'#CCCCCC', fg:'#000000' }
+    colors: COLORES_EQUIPOS[teamName.replace(/\s+(I|II)$/, '')] || { bg:'#CCCCCC', fg:'#000000' }
   })).sort((a,b) => b.points - a.points);
   
   // Encontrar mejores estadísticas globales
@@ -1763,7 +1763,8 @@ function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
   // Datos de jugadores
   topPlayers.forEach(player => {
     const team = teams.find(t => t.name === player.team);
-    const teamColors = team ? team.colors : { bg: '#CCCCCC', fg: '#000000' };
+    const baseTeamName = player.team.replace(/\s+(I|II)$/, '');
+    const teamColors = COLORES_EQUIPOS[baseTeamName] || { bg: '#CCCCCC', fg: '#000000' };
     
     // Jugador con colores del equipo y centrado
     const playerCell = ws.getCell(currentRow, startCol);

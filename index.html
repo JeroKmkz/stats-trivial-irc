@@ -1527,7 +1527,18 @@ function buildCopaSheet(ws, data) {
     points: data.teams[teamName] || 0,
     players: data.players
       .filter(p => p.team === teamName && !p.absent)
-      .sort((a,b) => (b.points||0) - (a.points||0)),
+      .sort((a,b) => {
+        const pointsDiff = (b.points||0) - (a.points||0);
+        if (pointsDiff !== 0) return pointsDiff;
+        
+        const acesDiff = (b.aces||0) - (a.aces||0);
+        if (acesDiff !== 0) return acesDiff;
+        
+        const scratchesDiff = (b.scratches||0) - (a.scratches||0);
+        if (scratchesDiff !== 0) return scratchesDiff;
+        
+        return (b.palos||0) - (a.palos||0);
+      }),
     colors: COLORES_EQUIPOS[teamName] || { bg:'#CCCCCC', fg:'#000000' }
   })).sort((a,b) => b.points - a.points);
   
@@ -1694,7 +1705,6 @@ function buildCopaSheet(ws, data) {
     // Separación y ranking individual
     widths.push(widthFromPx(20)); // separación
     widths.push(widthFromPx(20)); // separación adicional
-    widths.push(widthFromPx(80));  // EQUIPO
     widths.push(widthFromPx(120)); // JUGADOR
     widths.push(widthFromPx(35));  // PU
     widths.push(widthFromPx(35));  // PO
@@ -1714,14 +1724,25 @@ function buildCopaSheet(ws, data) {
 function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
   // Top 20 jugadores por puntos
   const topPlayers = allPlayers
-    .sort((a,b) => (b.points||0) - (a.points||0))
+    .sort((a,b) => {
+      const pointsDiff = (b.points||0) - (a.points||0);
+      if (pointsDiff !== 0) return pointsDiff;
+      
+      const acesDiff = (b.aces||0) - (a.aces||0);
+      if (acesDiff !== 0) return acesDiff;
+      
+      const scratchesDiff = (b.scratches||0) - (a.scratches||0);
+      if (scratchesDiff !== 0) return scratchesDiff;
+      
+      return (b.palos||0) - (a.palos||0);
+    })
     .slice(0, 20);
   
   const startCol = 21; // 2 columnas más a la derecha
   let currentRow = startRowParam; // Usar el parámetro pasado
   
   // Headers del ranking
-  const headers = ['EQUIPO', 'JUGADOR', 'PU', 'PO', 'SC', 'AC'];
+  const headers = ['JUGADOR', 'PU', 'PO', 'SC', 'AC'];
   headers.forEach((header, i) => {
     const cell = ws.getCell(currentRow, startCol + i);
     cell.value = header;
@@ -1736,17 +1757,12 @@ function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
     const team = teams.find(t => t.name === player.team);
     const teamColors = team ? team.colors : { bg: '#CCCCCC', fg: '#000000' };
     
-    // Equipo con colores
-    const teamCell = ws.getCell(currentRow, startCol);
-    teamCell.value = player.team;
-    teamCell.font = { color: { argb: teamColors.fg.replace('#','FF') } };
-    teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
-    teamCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    
-    // Jugador
-    const playerCell = ws.getCell(currentRow, startCol + 1);
+    // Jugador con colores del equipo y centrado
+    const playerCell = ws.getCell(currentRow, startCol);
     playerCell.value = player.name;
-    playerCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    playerCell.font = { color: { argb: teamColors.fg.replace('#','FF') } };
+    playerCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
+    playerCell.alignment = { horizontal: 'center', vertical: 'middle' };
     
     // Estadísticas: PU, PO, SC, AC
     const stats = [
@@ -1757,7 +1773,7 @@ function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
     ];
     
     stats.forEach((stat, i) => {
-      const cell = ws.getCell(currentRow, startCol + 2 + i);
+      const cell = ws.getCell(currentRow, startCol + 1 + i);
       // Solo mostrar valores > 0, excepto para PU (puntos) que siempre se muestra
       cell.value = (i === 0 || stat > 0) ? stat : '';
       cell.alignment = { horizontal: 'center', vertical: 'middle' };

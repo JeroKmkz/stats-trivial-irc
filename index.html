@@ -383,11 +383,11 @@ function onCompetitionChange(){
   // Agregar event listener para el cambio de GP Round
   const gpRoundSelect = document.getElementById('gpRoundSelect');
   if (gpRoundSelect) {
+    gpRoundSelect.removeEventListener('change', onGPRoundChange); // Evitar duplicados
     gpRoundSelect.addEventListener('change', onGPRoundChange);
     onGPRoundChange(); // Llamar una vez para configurar el estado inicial
   }
-  
-  }
+}
 
   function onGPRoundChange() {
     const gpRound = document.getElementById('gpRoundSelect')?.value;

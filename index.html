@@ -1421,6 +1421,35 @@ function buildGPTotalsSheet(ws, data){
   
   // Fila vacía abajo
   ws.addRow([]);
+
+// NUEVO: Si hay un solo grupo, colorear todos los jugadores como clasificados
+  if (groups.length === 1) {
+    console.log('Solo hay un grupo detectado - todos los jugadores clasifican');
+    
+    const singleGroup = groups[0];
+    const players = data.groups[singleGroup];
+    const qualifiedColor = { type: 'pattern', pattern: 'solid', fgColor: { argb: greenClassifiedARGB } }; // Usar el mismo verde que TOTAL
+    
+    // Colorear todas las filas de jugadores (empiezan en fila 3)
+    players.forEach((player, index) => {
+      const row = 3 + index; // Los datos empiezan en fila 3
+      
+      // Colorear todas las celdas de la fila del jugador (desde TOTAL hasta PAR)
+      for (let col = 0; col < 10; col++) { // 10 columnas: TOTAL, GLOBAL, DESC, nombre, GP1-GP5, PAR
+        const cell = ws.getCell(row, baseCol + col);
+        if (cell.value !== null && cell.value !== undefined && cell.value !== '') {
+          cell.fill = qualifiedColor;
+        }
+      }
+    });
+    
+    // Añadir nota explicativa al final
+    const noteRow = 3 + players.length + 2;
+    const noteCell = ws.getCell(noteRow, baseCol + 3); // En la columna del nombre
+    noteCell.value = '* Todos los jugadores clasifican (grupo único)';
+    noteCell.font = { italic: true, size: 10, color: { argb: 'FF666666' } };
+  } 
+
 }
 
 /* ================================================================

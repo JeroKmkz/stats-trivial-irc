@@ -1321,12 +1321,15 @@ function buildGPTotalsSheet(ws, data){
     
     // Calcular repescados si estamos en jornada 5+
     let repescados = [];
+    const isSingleGroup = groups.length === 1; // Detectar si hay un solo grupo
+    
     if (numJornadas >= 5) {
       // Encontrar jugadores que no están en top 12 pero cumplen criterios de repesca
       const noClasificados = players.slice(12); // Jugadores del puesto 13 en adelante
       const candidatosRepesca = noClasificados.filter(player => {
         const partidasJugadas = player.jornadas.filter(gpp => gpp > 0).length;
-        return partidasJugadas >= 4; // Mínimo 4 partidas
+        // Si hay un solo grupo, no aplicar restricción de partidas mínimas
+        return isSingleGroup || partidasJugadas >= 4;
       });
       
       // Ordenar candidatos por TOTAL y tomar máximo 6
@@ -1338,15 +1341,21 @@ function buildGPTotalsSheet(ws, data){
     players.forEach((player, playerIndex) => {
       const currentRow = 3 + playerIndex;
       
-      // Determinar color de fondo para clasificados (solo jornada 5+)
+      // Determinar color de fondo para clasificados
       let nameBackgroundColor = null;
       if (numJornadas >= 5) {
-        if (playerIndex < 12) {
-          // Top 12 - clasificados directos
+        if (isSingleGroup) {
+          // Si hay un solo grupo, todos los jugadores clasifican con color verde
           nameBackgroundColor = greenClassifiedARGB;
-        } else if (repescados.includes(player.name)) {
-          // Repescados
-          nameBackgroundColor = greenRepescaARGB;
+        } else {
+          // Lógica normal para múltiples grupos
+          if (playerIndex < 12) {
+            // Top 12 - clasificados directos
+            nameBackgroundColor = greenClassifiedARGB;
+          } else if (repescados.includes(player.name)) {
+            // Repescados
+            nameBackgroundColor = greenRepescaARGB;
+          }
         }
       }
       

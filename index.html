@@ -3272,30 +3272,29 @@ async function downloadExcel_RELEVOS(){
 }
 
 function buildRelevosSheet(ws, results) {
-  const themeW = widthFromPx(100);
+  const themeW = widthFromPx(118);  // Cambiado de 100 a 118
   const numW = widthFromPx(40);
   const posW = widthFromPx(35);
   const nameW = widthFromPx(140);
   
   // Colores
-  const headerBgARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
   const blackARGB = 'FF000000';
   const beigeARGB = 'FFF5E6D3';
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
-  // Cabeceras principales (solo una fila)
-  const headers = ['Pos', 'Equipo', 'T', 'S', 'P', 'A'];
+  // Cabeceras principales (solo una fila) - SIN "Equipo" ni "TEMA"
+  const headers = ['Pos', '', 'T', 's', 'p', 'a'];  // Cambiado a minúsculas
   results.themes.forEach(theme => {
-    headers.push('TEMA', 'T', 'S', 'P', 'A');
+    headers.push('', 'T', 's', 'p', 'a');  // Sin "TEMA" y en minúsculas
   });
   
   headers.forEach((header, col) => {
     const cell = ws.getCell(1, col + 1);
     cell.value = header;
     cell.font = { bold: true, color: { argb: whiteARGB } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };  // Fondo NEGRO
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
   
@@ -3346,14 +3345,18 @@ function buildRelevosSheet(ws, results) {
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
     
-    // Subtotales de temáticas (con nombre de temática en primera columna)
+    // Subtotales de temáticas (NOMBRE DE TEMÁTICA SOLO EN PRIMERA POSICIÓN)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
-      const baseCol = 7 + ((thematicNum - 1) * 5); // 5 columnas por temática (TEMA + T + S + P + A)
+      const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
       
-      // Nombre de la temática
+      // Nombre de la temática SOLO si es el primer equipo (position === 1)
       const themeCell = ws.getCell(currentRow, baseCol);
-      themeCell.value = thematicData ? thematicData.theme.toUpperCase() : '';
+      if (position === 1 && thematicData) {
+        themeCell.value = thematicData.theme.toUpperCase();
+      } else {
+        themeCell.value = '';
+      }
       themeCell.font = { bold: true, color: { argb: whiteARGB } };
       themeCell.fill = blackFill;
       themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -3389,7 +3392,7 @@ function buildRelevosSheet(ws, results) {
       }
     }
     
-    // Colocar jugadores en sus posiciones
+    // Colocar jugadores en sus posiciones (ORDENADOS)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
@@ -3404,7 +3407,7 @@ function buildRelevosSheet(ws, results) {
           playerNameCell.alignment = { horizontal: 'left', vertical: 'middle' };
           if (blockFill) playerNameCell.fill = blockFill;
           
-          // Estadísticas en T, S, P, A
+          // Estadísticas en T, s, p, a
           const playerStats = [player.points, player.scratches || '', player.palos || '', player.aces || ''];
           playerStats.forEach((val, i) => {
             const cell = ws.getCell(playerRow, baseCol + 1 + i);
@@ -3429,11 +3432,11 @@ function buildRelevosSheet(ws, results) {
   
   for (let i = 0; i < 3; i++) {
     const baseCol = 7 + (i * 5);
-    ws.getColumn(baseCol).width = themeW;     // TEMA
+    ws.getColumn(baseCol).width = themeW;     // TEMA (118px)
     ws.getColumn(baseCol + 1).width = numW;   // T
-    ws.getColumn(baseCol + 2).width = numW;   // S
-    ws.getColumn(baseCol + 3).width = numW;   // P
-    ws.getColumn(baseCol + 4).width = numW;   // A
+    ws.getColumn(baseCol + 2).width = numW;   // s
+    ws.getColumn(baseCol + 3).width = numW;   // p
+    ws.getColumn(baseCol + 4).width = numW;   // a
   }
 }
 

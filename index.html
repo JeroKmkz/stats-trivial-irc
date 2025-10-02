@@ -3276,20 +3276,20 @@ function buildRelevosSheet(ws, results) {
   const numW = widthFromPx(40);
   const posW = widthFromPx(35);
   const nameW = widthFromPx(85);  // Reducido de 140 a 85
-  
+
   // Colores
   const whiteARGB = 'FFFFFFFF';
   const blackARGB = 'FF000000';
   const beigeARGB = 'FFF5E6D3';
-  
+
   ws.views = [{ state: 'normal', showGridLines: false }];
-  
+
   // Cabeceras principales (solo una fila) - SIN "Equipo" ni "TEMA"
   const headers = ['Pos', '', 'T', 's', 'p', 'a'];
   results.themes.forEach(theme => {
     headers.push('', 'T', 's', 'p', 'a');
   });
-  
+
   headers.forEach((header, col) => {
     const cell = ws.getCell(1, col + 1);
     cell.value = header;
@@ -3297,7 +3297,7 @@ function buildRelevosSheet(ws, results) {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
-  
+
   // Escribir nombres de temáticas en la fila 1 (primera fila), alineados a la izquierda
   results.themes.forEach((themeName, themeIndex) => {
     const baseCol = 7 + (themeIndex * 5);
@@ -3307,41 +3307,39 @@ function buildRelevosSheet(ws, results) {
     themeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     themeCell.alignment = { horizontal: 'left', vertical: 'middle' };  // Alineado a la izquierda
   });
-  
+
   let currentRow = 2;
-  
+
   results.teams.forEach((team, teamIndex) => {
     const position = teamIndex + 1;
     const baseTeamName = team.name.replace(/\s+(I|II)$/, '');
     const teamColors = COLORES_EQUIPOS[baseTeamName] || { bg: '#CCCCCC', fg: '#000000' };
-    
+
     const blockFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
     const blackFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
-    
-    // Calcular filas necesarias: suma de jugadores de cada temática + líneas de separación
-    let maxRows = 0;
-    for (let i = 1; i <= 3; i++) {
-      const thematicData = team.thematics[`thematic${i}`];
-      if (thematicData && thematicData.players.length > 0) {
-        maxRows += thematicData.players.length + 1;  // jugadores + 1 línea de separación
-      }
-    }
-    
-    const totalRowsForTeam = 1 + maxRows;
-    
+
+    // === FILAS REALES: suma de jugadores de cada temática (sin separadores) ===
+    const len1 = team.thematics?.thematic1?.players?.length || 0;
+    const len2 = team.thematics?.thematic2?.players?.length || 0;
+    const len3 = team.thematics?.thematic3?.players?.length || 0;
+    const rowsForPlayers = len1 + len2 + len3;
+
+    // 1 = fila de cabecera del equipo
+    const totalRowsForTeam = 1 + rowsForPlayers;
+
     // FILA DEL EQUIPO (fondo negro)
     const posCell = ws.getCell(currentRow, 1);
     posCell.value = position;
     posCell.font = { bold: true, color: { argb: whiteARGB } };
     posCell.fill = blackFill;
     posCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    
+
     const teamCell = ws.getCell(currentRow, 2);
     teamCell.value = team.name;
     teamCell.font = { bold: true, color: { argb: teamColors.fg.replace('#','FF') } };
     teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
     teamCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    
+
     // Totales generales
     const totals = [team.totalPoints, team.totalScratches, team.totalPalos, team.totalAces];
     totals.forEach((val, i) => {
@@ -3351,19 +3349,19 @@ function buildRelevosSheet(ws, results) {
       cell.fill = blackFill;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
-    
+
     // Subtotales de temáticas (sin nombre de temática, ya está en fila 1)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
-      
+
       // Celda vacía donde antes iba el nombre de la temática
       const themeCell = ws.getCell(currentRow, baseCol);
       themeCell.value = '';
       themeCell.font = { bold: true, color: { argb: whiteARGB } };
       themeCell.fill = blackFill;
       themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      
+
       if (thematicData) {
         const thematicTotals = [
           thematicData.points,
@@ -3371,7 +3369,7 @@ function buildRelevosSheet(ws, results) {
           thematicData.palos,
           thematicData.aces
         ];
-        
+
         thematicTotals.forEach((val, i) => {
           const cell = ws.getCell(currentRow, baseCol + 1 + i);
           cell.value = val;
@@ -3386,31 +3384,31 @@ function buildRelevosSheet(ws, results) {
         }
       }
     }
-    
-    // Rellenar todas las filas del bloque con el color de fondo
-    for (let r = 1; r <= maxRows; r++) {
+
+    // Rellenar fondo del bloque de jugadores (exactamente las filas reales pintadas)
+    for (let r = 1; r <= rowsForPlayers; r++) {
       for (let c = 1; c <= 6 + (3 * 5); c++) {
         const cell = ws.getCell(currentRow + r, c);
         if (blockFill) cell.fill = blockFill;
       }
     }
-    
-    // Colocar jugadores en sus posiciones (CORREGIDO: sin saltos entre temas, solo después de jugadores)
-    let playerRow = currentRow + 1;  // Empezamos en la primera fila después del equipo
-    
+
+    // Colocar jugadores SIN saltos extra entre temáticas
+    let playerRow = currentRow + 1;  // primera fila tras la cabecera del equipo
+
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
-      
+
       if (thematicData && thematicData.players.length > 0) {
-        thematicData.players.forEach((player, playerIdx) => {
-          // Nombre en la columna TEMA
+        thematicData.players.forEach((player) => {
+          // Nombre
           const playerNameCell = ws.getCell(playerRow, baseCol);
           playerNameCell.value = player.name;
           playerNameCell.alignment = { horizontal: 'left', vertical: 'middle' };
           if (blockFill) playerNameCell.fill = blockFill;
-          
-          // Estadísticas en T, s, p, a
+
+          // T, s, p, a
           const playerStats = [player.points, player.scratches || '', player.palos || '', player.aces || ''];
           playerStats.forEach((val, i) => {
             const cell = ws.getCell(playerRow, baseCol + 1 + i);
@@ -3418,16 +3416,18 @@ function buildRelevosSheet(ws, results) {
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
             if (blockFill) cell.fill = blockFill;
           });
-          
-          playerRow++;  // Avanzamos una fila por cada jugador
-        });        
-        
+
+          playerRow++; // avanzar UNA fila por jugador
+        });
+
+        // --- IMPORTANTE: sin "playerRow++" extra al terminar la temática ---
       }
     }
-    
+
+    // Avance al siguiente equipo: 1 (cabecera) + filas reales de jugadores
     currentRow += totalRowsForTeam;
   });
-  
+
   // Configurar anchos
   ws.getColumn(1).width = posW;
   ws.getColumn(2).width = nameW;  // 85 píxeles
@@ -3435,7 +3435,7 @@ function buildRelevosSheet(ws, results) {
   ws.getColumn(4).width = numW;
   ws.getColumn(5).width = numW;
   ws.getColumn(6).width = numW;
-  
+
   for (let i = 0; i < 3; i++) {
     const baseCol = 7 + (i * 5);
     ws.getColumn(baseCol).width = themeW;     // TEMA (118px)
@@ -3445,6 +3445,7 @@ function buildRelevosSheet(ws, results) {
     ws.getColumn(baseCol + 4).width = numW;   // a
   }
 }
+
 
 /* ==================== FIN BLOQUE RELEVOS ===================== */
 

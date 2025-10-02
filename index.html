@@ -3272,10 +3272,10 @@ async function downloadExcel_RELEVOS(){
 }
 
 function buildRelevosSheet(ws, results) {
-  const themeW = widthFromPx(118);  // Cambiado de 100 a 118
+  const themeW = widthFromPx(118);
   const numW = widthFromPx(40);
   const posW = widthFromPx(35);
-  const nameW = widthFromPx(140);
+  const nameW = widthFromPx(85);  // Reducido de 140 a 85
   
   // Colores
   const whiteARGB = 'FFFFFFFF';
@@ -3285,17 +3285,27 @@ function buildRelevosSheet(ws, results) {
   ws.views = [{ state: 'normal', showGridLines: false }];
   
   // Cabeceras principales (solo una fila) - SIN "Equipo" ni "TEMA"
-  const headers = ['Pos', '', 'T', 's', 'p', 'a'];  // Cambiado a minúsculas
+  const headers = ['Pos', '', 'T', 's', 'p', 'a'];
   results.themes.forEach(theme => {
-    headers.push('', 'T', 's', 'p', 'a');  // Sin "TEMA" y en minúsculas
+    headers.push('', 'T', 's', 'p', 'a');
   });
   
   headers.forEach((header, col) => {
     const cell = ws.getCell(1, col + 1);
     cell.value = header;
     cell.font = { bold: true, color: { argb: whiteARGB } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };  // Fondo NEGRO
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  
+  // Escribir nombres de temáticas en la fila 1 (primera fila), alineados a la izquierda
+  results.themes.forEach((themeName, themeIndex) => {
+    const baseCol = 7 + (themeIndex * 5);
+    const themeCell = ws.getCell(1, baseCol);
+    themeCell.value = themeName.toUpperCase();
+    themeCell.font = { bold: true, color: { argb: whiteARGB } };
+    themeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
+    themeCell.alignment = { horizontal: 'left', vertical: 'middle' };  // Alineado a la izquierda
   });
   
   let currentRow = 2;
@@ -3308,15 +3318,12 @@ function buildRelevosSheet(ws, results) {
     const blockFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
     const blackFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     
-    // Calcular filas necesarias
+    // Calcular filas necesarias: suma de jugadores de cada temática + líneas de separación
     let maxRows = 0;
     for (let i = 1; i <= 3; i++) {
       const thematicData = team.thematics[`thematic${i}`];
-      if (thematicData) {
-        const rowsForThisThematic = (i - 1) + thematicData.players.length;
-        if (rowsForThisThematic > maxRows) {
-          maxRows = rowsForThisThematic;
-        }
+      if (thematicData && thematicData.players.length > 0) {
+        maxRows += thematicData.players.length + 1;  // jugadores + 1 línea de separación
       }
     }
     
@@ -3345,18 +3352,14 @@ function buildRelevosSheet(ws, results) {
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
     
-    // Subtotales de temáticas (NOMBRE DE TEMÁTICA SOLO EN PRIMERA POSICIÓN)
+    // Subtotales de temáticas (sin nombre de temática, ya está en fila 1)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
       
-      // Nombre de la temática SOLO si es el primer equipo (position === 1)
+      // Celda vacía donde antes iba el nombre de la temática
       const themeCell = ws.getCell(currentRow, baseCol);
-      if (position === 1 && thematicData) {
-        themeCell.value = thematicData.theme.toUpperCase();
-      } else {
-        themeCell.value = '';
-      }
+      themeCell.value = '';
       themeCell.font = { bold: true, color: { argb: whiteARGB } };
       themeCell.fill = blackFill;
       themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -3392,15 +3395,15 @@ function buildRelevosSheet(ws, results) {
       }
     }
     
-    // Colocar jugadores en sus posiciones (ORDENADOS)
+    // Colocar jugadores en sus posiciones (CORREGIDO: sin saltos entre temas, solo después de jugadores)
+    let playerRow = currentRow + 1;  // Empezamos en la primera fila después del equipo
+    
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
       
-      if (thematicData) {
+      if (thematicData && thematicData.players.length > 0) {
         thematicData.players.forEach((player, playerIdx) => {
-          const playerRow = currentRow + 1 + (thematicNum - 1) + playerIdx;
-          
           // Nombre en la columna TEMA
           const playerNameCell = ws.getCell(playerRow, baseCol);
           playerNameCell.value = player.name;
@@ -3415,7 +3418,11 @@ function buildRelevosSheet(ws, results) {
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
             if (blockFill) cell.fill = blockFill;
           });
+          
+          playerRow++;  // Avanzamos una fila por cada jugador
         });
+        
+        playerRow++;  // Saltamos una línea después del último jugador de esta temática
       }
     }
     
@@ -3424,7 +3431,7 @@ function buildRelevosSheet(ws, results) {
   
   // Configurar anchos
   ws.getColumn(1).width = posW;
-  ws.getColumn(2).width = nameW;
+  ws.getColumn(2).width = nameW;  // 85 píxeles
   ws.getColumn(3).width = numW;
   ws.getColumn(4).width = numW;
   ws.getColumn(5).width = numW;

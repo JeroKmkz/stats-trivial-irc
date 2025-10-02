@@ -3280,7 +3280,7 @@ function buildRelevosSheet(ws, results) {
   const headerBgARGB = 'FF0B7D7D';
   const whiteARGB = 'FFFFFFFF';
   const blackARGB = 'FF000000';
-  const beigeARGB = 'FFF5E6D3'; // Beige claro para filas alternas
+  const beigeARGB = 'FFF5E6D3';
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
@@ -3299,14 +3299,13 @@ function buildRelevosSheet(ws, results) {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       
-      // Merge para nombres de temáticas (4 columnas)
       if (col >= 6 && (col - 6) % 4 === 0) {
         ws.mergeCells(1, col + 1, 1, col + 4);
       }
     }
   });
   
-  // Fila 2: Subheaders (T, S, P, A para cada temática)
+  // Fila 2: Subheaders
   const subHeaders = ['', '', '', '', '', ''];
   for (let i = 0; i < 3; i++) {
     subHeaders.push('T', 'S', 'P', 'A');
@@ -3322,7 +3321,6 @@ function buildRelevosSheet(ws, results) {
     }
   });
   
-  // Datos de equipos
   let currentRow = 3;
   
   results.teams.forEach((team, teamIndex) => {
@@ -3330,49 +3328,55 @@ function buildRelevosSheet(ws, results) {
     const baseTeamName = team.name.replace(/\s+(I|II)$/, '');
     const teamColors = COLORES_EQUIPOS[baseTeamName] || { bg: '#CCCCCC', fg: '#000000' };
     
-    // Color de fondo alternado para toda la fila del equipo
-    const rowFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
+    // Determinar color de fondo para este bloque de equipo
+    const blockFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
+    const blackFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     
+    // Calcular cuántas filas ocupa este equipo
+    let maxRows = 0;
+    for (let i = 1; i <= 3; i++) {
+      const thematicData = team.thematics[`thematic${i}`];
+      if (thematicData) {
+        const rowsForThisThematic = (i - 1) + thematicData.players.length;
+        if (rowsForThisThematic > maxRows) {
+          maxRows = rowsForThisThematic;
+        }
+      }
+    }
+    
+    const totalRowsForTeam = 1 + maxRows;
+    
+    // FILA DEL EQUIPO (fondo negro, letras blancas excepto nombre)
     // Posición
     const posCell = ws.getCell(currentRow, 1);
     posCell.value = position;
-    posCell.font = { bold: true };
+    posCell.font = { bold: true, color: { argb: whiteARGB } };
+    posCell.fill = blackFill;
     posCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    if (rowFill) posCell.fill = rowFill;
     
-    // Equipo (con colores)
+    // Equipo (con sus colores propios)
     const teamCell = ws.getCell(currentRow, 2);
     teamCell.value = team.name;
     teamCell.font = { bold: true, color: { argb: teamColors.fg.replace('#','FF') } };
     teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
     teamCell.alignment = { horizontal: 'left', vertical: 'middle' };
     
-    // Totales generales (T, S, P, A)
+    // Totales generales con fondo negro
     const totals = [team.totalPoints, team.totalScratches, team.totalPalos, team.totalAces];
     totals.forEach((val, i) => {
       const cell = ws.getCell(currentRow, 3 + i);
       cell.value = val;
-      cell.font = { bold: true };
+      cell.font = { bold: true, color: { argb: whiteARGB } };
+      cell.fill = blackFill;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      if (rowFill) cell.fill = rowFill;
     });
     
-    // Calcular cuántas filas necesita este equipo (máximo de jugadores en cualquier temática)
-    let maxPlayersInAnyThematic = 0;
-    for (let i = 1; i <= 3; i++) {
-      const thematicData = team.thematics[`thematic${i}`];
-      if (thematicData && thematicData.players.length > maxPlayersInAnyThematic) {
-        maxPlayersInAnyThematic = thematicData.players.length;
-      }
-    }
-    
-    // Procesar cada temática
+    // Subtotales de temáticas en la fila del equipo (fondo negro)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
       const baseCol = 7 + ((thematicNum - 1) * 4);
       const thematicData = team.thematics[`thematic${thematicNum}`];
       
       if (thematicData) {
-        // Subtotales del equipo en esta temática (fila del equipo)
         const thematicTotals = [
           thematicData.points,
           thematicData.scratches,
@@ -3383,55 +3387,73 @@ function buildRelevosSheet(ws, results) {
         thematicTotals.forEach((val, i) => {
           const cell = ws.getCell(currentRow, baseCol + i);
           cell.value = val;
-          cell.font = { bold: true };
+          cell.font = { bold: true, color: { argb: whiteARGB } };
+          cell.fill = blackFill;
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
-          if (rowFill) cell.fill = rowFill;
         });
-        
-        // Jugadores de esta temática (desplazados según el número de temática)
+      } else {
+        // Rellenar con fondo negro aunque no haya datos
+        for (let i = 0; i < 4; i++) {
+          const cell = ws.getCell(currentRow, baseCol + i);
+          cell.fill = blackFill;
+        }
+      }
+    }
+    
+    // FILAS DE JUGADORES (con desplazamiento por temática)
+    // Primero rellenar TODO el bloque con el color de fondo
+    for (let r = 1; r <= maxRows; r++) {
+      for (let c = 1; c <= 6 + (3 * 4); c++) {
+        const cell = ws.getCell(currentRow + r, c);
+        if (blockFill) cell.fill = blockFill;
+      }
+    }
+    
+    // Ahora colocar los jugadores en sus posiciones correctas
+    for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
+      const baseCol = 7 + ((thematicNum - 1) * 4);
+      const thematicData = team.thematics[`thematic${thematicNum}`];
+      
+      if (thematicData) {
         thematicData.players.forEach((player, playerIdx) => {
           const playerRow = currentRow + 1 + (thematicNum - 1) + playerIdx;
           
-          // Color de fondo alternado para jugadores
-          const playerRowFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
-          
-          // Nombre del jugador (en columna del equipo, pero sin color)
+          // Nombre del jugador en la columna 2
           const playerNameCell = ws.getCell(playerRow, 2);
           playerNameCell.value = player.name;
           playerNameCell.alignment = { horizontal: 'left', vertical: 'middle' };
-          if (playerRowFill) playerNameCell.fill = playerRowFill;
+          if (blockFill) playerNameCell.fill = blockFill;
           
-          // Estadísticas del jugador
+          // Estadísticas del jugador en las columnas de esta temática
           const playerStats = [player.points, player.scratches || '', player.palos || '', player.aces || ''];
           playerStats.forEach((val, i) => {
             const cell = ws.getCell(playerRow, baseCol + i);
             cell.value = val;
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            if (playerRowFill) cell.fill = playerRowFill;
+            if (blockFill) cell.fill = blockFill;
           });
         });
       }
     }
     
-    // Avanzar al siguiente equipo (después de la fila del equipo + desplazamiento máximo)
-    currentRow += 1 + 2 + maxPlayersInAnyThematic; // 1 del equipo + 2 de desplazamiento + jugadores
+    // Avanzar al siguiente equipo
+    currentRow += totalRowsForTeam;
   });
   
   // Configurar anchos de columnas
-  ws.getColumn(1).width = posW;  // Pos
-  ws.getColumn(2).width = nameW; // Equipo/Jugadores
-  ws.getColumn(3).width = numW;  // T
-  ws.getColumn(4).width = numW;  // S
-  ws.getColumn(5).width = numW;  // P
-  ws.getColumn(6).width = numW;  // A
+  ws.getColumn(1).width = posW;
+  ws.getColumn(2).width = nameW;
+  ws.getColumn(3).width = numW;
+  ws.getColumn(4).width = numW;
+  ws.getColumn(5).width = numW;
+  ws.getColumn(6).width = numW;
   
-  // Anchos para las 3 temáticas
   for (let i = 0; i < 3; i++) {
     const baseCol = 7 + (i * 4);
-    ws.getColumn(baseCol).width = numW;     // T
-    ws.getColumn(baseCol + 1).width = numW; // S
-    ws.getColumn(baseCol + 2).width = numW; // P
-    ws.getColumn(baseCol + 3).width = numW; // A
+    ws.getColumn(baseCol).width = numW;
+    ws.getColumn(baseCol + 1).width = numW;
+    ws.getColumn(baseCol + 2).width = numW;
+    ws.getColumn(baseCol + 3).width = numW;
   }
 }
 

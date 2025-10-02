@@ -312,6 +312,8 @@ document.addEventListener('DOMContentLoaded', () => {
       processJornada_COPA();
     } else if (competitionType === 'master') {
       processJornada_MASTER();
+    } else if (competitionType === 'relevos') {
+      processJornada_RELEVOS();
     } else {
       processJornada_LIGA();
     }
@@ -328,6 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
       downloadExcel_COPA();
     } else if (competitionType === 'master') {
       downloadExcel_MASTER();
+    } else if (competitionType === 'relevos') {
+      downloadExcel_RELEVOS();
     } else {
       downloadExcel_LIGA();
     }
@@ -3025,6 +3029,355 @@ function buildMasterSheet(ws, data) {
   // Reutilizar la misma lógica que Copa pero con máximo 2 jugadores por equipo
   buildCopaSheet(ws, data);
 }
+
+/* ================================================================
+   ====================== BLOQUE RELEVOS ==========================
+   ================================================================ */
+
+function processJornada_RELEVOS(){
+  const files = document.getElementById('fileInputJornada').files;
+  if (!files || files.length !== 3) {
+    return showError('Para el Torneo Relevos debes subir exactamente 3 archivos (.txt) correspondientes a las 3 temáticas');
+  }
+  
+  // Pedir las 3 temáticas al usuario
+  const theme1 = prompt('Nombre de la 1ª temática:');
+  if (!theme1) return showError('Debes introducir el nombre de la 1ª temática');
+  
+  const theme2 = prompt('Nombre de la 2ª temática:');
+  if (!theme2) return showError('Debes introducir el nombre de la 2ª temática');
+  
+  const theme3 = prompt('Nombre de la 3ª temática:');
+  if (!theme3) return showError('Debes introducir el nombre de la 3ª temática');
+  
+  const themes = [theme1, theme2, theme3];
+  
+  processedData = { isRelevos: true, themes: themes, logs: [] };
+  let processed = 0;
+  
+  Array.from(files).forEach(async (file, index) => {
+    try {
+      const text = await file.text();
+      const logData = parseRelevosLog(text, themes[index], index + 1);
+      processedData.logs[index] = logData;
+      processed++;
+      
+      if (processed === files.length) {
+        // Procesar datos del torneo
+        const relevosResults = processRelevosResults(processedData.logs, themes);
+        processedData.relevosResults = relevosResults;
+        
+        const res = document.getElementById('results');
+        res.innerHTML = `<div class="success">Torneo Relevos: 3 archivos procesados. Pulsa "Descargar Excel".</div>`;
+        res.style.display = 'block';
+        document.getElementById('downloadSection').style.display='block';
+        document.getElementById('downloadBtn').disabled = false;
+        currentProcess='jornada';
+      }
+    } catch(err) { 
+      showError(`Error procesando ${file.name}: ${err.message}`); 
+    }
+  });
+}
+
+function parseRelevosLog(content, theme, logNumber) {
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  const teamStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION EQUIPOS'));
+  const playerStart = lines.findIndex(l => l.toUpperCase().includes('CLASIFICACION INDIVIDUAL'));
+  
+  if (teamStart === -1 || playerStart === -1) {
+    throw new Error('Secciones no encontradas en el log');
+  }
+  
+  // Extraer equipos con puntuaciones
+  const teams = {};
+  for (let i = teamStart + 1; i < playerStart; i++) {
+    const m = /^(.*?)\s+(-?\d+)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    const teamName = m[1].trim();
+    const points = parseInt(m[2], 10);
+    teams[teamName] = points;
+  }
+  
+  // Extraer jugadores
+  const players = {};
+  for (let i = playerStart + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) continue;
+    
+    const name = parts[0].toUpperCase();
+    const isAbsent = line.toUpperCase().includes('NO ESTUVO PRESENTE');
+    const points = isAbsent ? 0 : parseInt(parts[1], 10);
+    const aces = isAbsent ? 0 : parseInt((line.match(/Aces:\s*(\d+)/i) || [0,0])[1], 10);
+    const scratches = isAbsent ? 0 : parseInt((line.match(/Scr:\s*(\d+)/i) || [0,0])[1], 10);
+    const palos = isAbsent ? 0 : parseInt((line.match(/Palos:\s*(\d+)/i) || [0,0])[1], 10);
+    
+    // Solo guardar si participó (tiene algún valor > 0)
+    const participated = points > 0 || aces > 0 || scratches > 0 || palos > 0;
+    
+    if (participated) {
+      players[name] = {
+        name: name,
+        points: points,
+        aces: aces,
+        scratches: scratches,
+        palos: palos
+      };
+    }
+  }
+  
+  return {
+    theme: theme,
+    logNumber: logNumber,
+    teams: teams,
+    players: players
+  };
+}
+
+function processRelevosResults(logs, themes) {
+  const allTeams = {};
+  
+  // Obtener lista de todos los equipos únicos
+  logs.forEach(log => {
+    Object.keys(log.teams).forEach(teamName => {
+      if (!allTeams[teamName]) {
+        allTeams[teamName] = {
+          name: teamName,
+          totalPoints: 0,
+          totalScratches: 0,
+          totalPalos: 0,
+          totalAces: 0,
+          thematics: {},
+          players: {} // {playerName: {thematic1: {...}, thematic2: {...}}}
+        };
+      }
+    });
+  });
+  
+  // Acumular estadísticas por equipo y por jugador
+  logs.forEach(log => {
+    const themeName = `thematic${log.logNumber}`;
+    
+    Object.entries(log.teams).forEach(([teamName, teamPoints]) => {
+      const team = allTeams[teamName];
+      
+      // Acumular totales del equipo
+      team.totalPoints += teamPoints;
+      
+      // Guardar datos de esta temática para el equipo
+      team.thematics[themeName] = {
+        theme: log.theme,
+        points: teamPoints,
+        scratches: 0,
+        palos: 0,
+        aces: 0,
+        players: []
+      };
+    });
+    
+    // Asignar jugadores a equipos y acumular sus estadísticas
+    const teamNames = Object.keys(log.teams).sort((a, b) => 
+      a.localeCompare(b, 'es', { sensitivity: 'base' })
+    );
+    
+    const playerNames = Object.keys(log.players).sort((a, b) => 
+      a.localeCompare(b, 'es', { sensitivity: 'base' })
+    );
+    
+    let currentTeamIndex = 0;
+    let prevPlayerName = '';
+    
+    playerNames.forEach((playerName, index) => {
+      const playerData = log.players[playerName];
+      
+      // Detectar cambio de equipo por salto alfabético
+      if (index > 0 && playerName.localeCompare(prevPlayerName, 'es', { sensitivity: 'base' }) < 0) {
+        currentTeamIndex++;
+        if (currentTeamIndex >= teamNames.length) {
+          currentTeamIndex = teamNames.length - 1;
+        }
+      }
+      
+      const teamName = teamNames[currentTeamIndex];
+      const team = allTeams[teamName];
+      
+      // Acumular estadísticas del equipo en esta temática
+      team.thematics[themeName].scratches += playerData.scratches;
+      team.thematics[themeName].palos += playerData.palos;
+      team.thematics[themeName].aces += playerData.aces;
+      team.thematics[themeName].players.push({
+        name: playerName,
+        points: playerData.points,
+        scratches: playerData.scratches,
+        palos: playerData.palos,
+        aces: playerData.aces
+      });
+      
+      // Acumular totales generales del equipo
+      team.totalScratches += playerData.scratches;
+      team.totalPalos += playerData.palos;
+      team.totalAces += playerData.aces;
+      
+      // Guardar información del jugador
+      if (!team.players[playerName]) {
+        team.players[playerName] = {};
+      }
+      team.players[playerName][themeName] = {
+        theme: log.theme,
+        points: playerData.points,
+        scratches: playerData.scratches,
+        palos: playerData.palos,
+        aces: playerData.aces
+      };
+      
+      prevPlayerName = playerName;
+    });
+  });
+  
+  // Ordenar equipos por puntos totales
+  const sortedTeams = Object.values(allTeams).sort((a, b) => b.totalPoints - a.totalPoints);
+  
+  return {
+    teams: sortedTeams,
+    themes: themes
+  };
+}
+
+async function downloadExcel_RELEVOS(){
+  if (!processedData || !processedData.isRelevos) {
+    return showError('No hay datos procesados del Torneo Relevos');
+  }
+  
+  const wb = new ExcelJS.Workbook();
+  wb.created = new Date();
+  
+  const ws = wb.addWorksheet('Torneo Relevos', { views:[{ state:'normal', showGridLines:false }] });
+  buildRelevosSheet(ws, processedData.relevosResults);
+  
+  const uint8 = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `Torneo_Relevos.xlsx`);
+  showSuccess('Excel Torneo Relevos generado correctamente.');
+}
+
+function buildRelevosSheet(ws, results) {
+  const nameW = widthFromPx(120);
+  const numW = widthFromPx(45);
+  
+  // Colores
+  const headerBgARGB = 'FF0B7D7D';
+  const whiteARGB = 'FFFFFFFF';
+  const blackARGB = 'FF000000';
+  const lightGrayARGB = 'FFE8E8E8';
+  
+  ws.views = [{ state: 'normal', showGridLines: false }];
+  
+  let currentRow = 1;
+  
+  // Título principal
+  const titleCell = ws.getCell(currentRow, 1);
+  titleCell.value = 'TORNEO RELEVOS';
+  titleCell.font = { bold: true, size: 16, color: { argb: whiteARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.mergeCells(currentRow, 1, currentRow, 6);
+  
+  currentRow += 2;
+  
+  // Procesar cada equipo
+  results.teams.forEach((team, teamIndex) => {
+    // Cabecera del equipo
+    const teamHeaderCell = ws.getCell(currentRow, 1);
+    teamHeaderCell.value = team.name;
+    teamHeaderCell.font = { bold: true, size: 14 };
+    teamHeaderCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    
+    // Color de fondo del equipo
+    const baseTeamName = team.name.replace(/\s+(I|II)$/, '');
+    const teamColors = COLORES_EQUIPOS[baseTeamName] || { bg: '#CCCCCC', fg: '#000000' };
+    teamHeaderCell.font = { bold: true, size: 14, color: { argb: teamColors.fg.replace('#','FF') } };
+    teamHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
+    
+    // Totales del equipo
+    ws.getCell(currentRow, 2).value = 'TOTAL';
+    ws.getCell(currentRow, 3).value = team.totalPoints;
+    ws.getCell(currentRow, 4).value = team.totalScratches;
+    ws.getCell(currentRow, 5).value = team.totalPalos;
+    ws.getCell(currentRow, 6).value = team.totalAces;
+    
+    // Formato de totales
+    for (let col = 2; col <= 6; col++) {
+      const cell = ws.getCell(currentRow, col);
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+    
+    currentRow++;
+    
+    // Procesar cada temática
+    for (let i = 1; i <= 3; i++) {
+      const thematicKey = `thematic${i}`;
+      const thematicData = team.thematics[thematicKey];
+      
+      if (thematicData) {
+        // Cabecera de la temática
+        const themeCell = ws.getCell(currentRow, 2);
+        themeCell.value = thematicData.theme.toUpperCase();
+        themeCell.font = { bold: true, italic: true };
+        themeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } };
+        themeCell.alignment = { horizontal: 'left', vertical: 'middle' };
+        
+        // Subtotales de la temática
+        ws.getCell(currentRow, 3).value = thematicData.points;
+        ws.getCell(currentRow, 4).value = thematicData.scratches;
+        ws.getCell(currentRow, 5).value = thematicData.palos;
+        ws.getCell(currentRow, 6).value = thematicData.aces;
+        
+        for (let col = 3; col <= 6; col++) {
+          const cell = ws.getCell(currentRow, col);
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+        
+        currentRow++;
+        
+        // Jugadores de esta temática
+        thematicData.players.forEach(player => {
+          ws.getCell(currentRow, 3).value = player.name;
+          ws.getCell(currentRow, 4).value = player.points;
+          ws.getCell(currentRow, 5).value = player.scratches || '';
+          ws.getCell(currentRow, 6).value = player.palos || '';
+          ws.getCell(currentRow, 7).value = player.aces || '';
+          
+          // Formato jugadores
+          for (let col = 3; col <= 7; col++) {
+            const cell = ws.getCell(currentRow, col);
+            cell.alignment = { horizontal: col === 3 ? 'left' : 'center', vertical: 'middle' };
+          }
+          
+          currentRow++;
+        });
+      }
+    }
+    
+    // Línea en blanco entre equipos
+    currentRow++;
+  });
+  
+  // Configurar anchos de columnas
+  ws.getColumn(1).width = nameW;
+  ws.getColumn(2).width = nameW;
+  ws.getColumn(3).width = numW;
+  ws.getColumn(4).width = numW;
+  ws.getColumn(5).width = numW;
+  ws.getColumn(6).width = numW;
+  ws.getColumn(7).width = numW;
+}
+
+/* ==================== FIN BLOQUE RELEVOS ===================== */
 
 /* ===================== FIN BLOQUE MASTER ===================== */
   

@@ -3272,9 +3272,10 @@ async function downloadExcel_RELEVOS(){
 }
 
 function buildRelevosSheet(ws, results) {
-  const nameW = widthFromPx(140);
+  const themeW = widthFromPx(100);
   const numW = widthFromPx(40);
   const posW = widthFromPx(35);
+  const nameW = widthFromPx(140);
   
   // Colores
   const headerBgARGB = 'FF0B7D7D';
@@ -3284,55 +3285,31 @@ function buildRelevosSheet(ws, results) {
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
-  // Cabeceras principales
+  // Cabeceras principales (solo una fila)
   const headers = ['Pos', 'Equipo', 'T', 'S', 'P', 'A'];
   results.themes.forEach(theme => {
-    headers.push(theme.toUpperCase(), '', '', '');
+    headers.push('TEMA', 'T', 'S', 'P', 'A');
   });
   
-  // Fila 1: Cabeceras principales
   headers.forEach((header, col) => {
-    if (header) {
-      const cell = ws.getCell(1, col + 1);
-      cell.value = header;
-      cell.font = { bold: true, color: { argb: whiteARGB } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      
-      if (col >= 6 && (col - 6) % 4 === 0) {
-        ws.mergeCells(1, col + 1, 1, col + 4);
-      }
-    }
+    const cell = ws.getCell(1, col + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: whiteARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
   
-  // Fila 2: Subheaders
-  const subHeaders = ['', '', '', '', '', ''];
-  for (let i = 0; i < 3; i++) {
-    subHeaders.push('T', 'S', 'P', 'A');
-  }
-  
-  subHeaders.forEach((header, col) => {
-    if (header) {
-      const cell = ws.getCell(2, col + 1);
-      cell.value = header;
-      cell.font = { bold: true, color: { argb: whiteARGB } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    }
-  });
-  
-  let currentRow = 3;
+  let currentRow = 2;
   
   results.teams.forEach((team, teamIndex) => {
     const position = teamIndex + 1;
     const baseTeamName = team.name.replace(/\s+(I|II)$/, '');
     const teamColors = COLORES_EQUIPOS[baseTeamName] || { bg: '#CCCCCC', fg: '#000000' };
     
-    // Determinar color de fondo para este bloque de equipo
     const blockFill = (teamIndex % 2 === 1) ? { type: 'pattern', pattern: 'solid', fgColor: { argb: beigeARGB } } : null;
     const blackFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
     
-    // Calcular cuántas filas ocupa este equipo
+    // Calcular filas necesarias
     let maxRows = 0;
     for (let i = 1; i <= 3; i++) {
       const thematicData = team.thematics[`thematic${i}`];
@@ -3346,22 +3323,20 @@ function buildRelevosSheet(ws, results) {
     
     const totalRowsForTeam = 1 + maxRows;
     
-    // FILA DEL EQUIPO (fondo negro, letras blancas excepto nombre)
-    // Posición
+    // FILA DEL EQUIPO (fondo negro)
     const posCell = ws.getCell(currentRow, 1);
     posCell.value = position;
     posCell.font = { bold: true, color: { argb: whiteARGB } };
     posCell.fill = blackFill;
     posCell.alignment = { horizontal: 'center', vertical: 'middle' };
     
-    // Equipo (con sus colores propios)
     const teamCell = ws.getCell(currentRow, 2);
     teamCell.value = team.name;
     teamCell.font = { bold: true, color: { argb: teamColors.fg.replace('#','FF') } };
     teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
     teamCell.alignment = { horizontal: 'left', vertical: 'middle' };
     
-    // Totales generales con fondo negro
+    // Totales generales
     const totals = [team.totalPoints, team.totalScratches, team.totalPalos, team.totalAces];
     totals.forEach((val, i) => {
       const cell = ws.getCell(currentRow, 3 + i);
@@ -3371,10 +3346,17 @@ function buildRelevosSheet(ws, results) {
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
     
-    // Subtotales de temáticas en la fila del equipo (fondo negro)
+    // Subtotales de temáticas (con nombre de temática en primera columna)
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
-      const baseCol = 7 + ((thematicNum - 1) * 4);
+      const baseCol = 7 + ((thematicNum - 1) * 5); // 5 columnas por temática (TEMA + T + S + P + A)
       const thematicData = team.thematics[`thematic${thematicNum}`];
+      
+      // Nombre de la temática
+      const themeCell = ws.getCell(currentRow, baseCol);
+      themeCell.value = thematicData ? thematicData.theme.toUpperCase() : '';
+      themeCell.font = { bold: true, color: { argb: whiteARGB } };
+      themeCell.fill = blackFill;
+      themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
       
       if (thematicData) {
         const thematicTotals = [
@@ -3385,49 +3367,47 @@ function buildRelevosSheet(ws, results) {
         ];
         
         thematicTotals.forEach((val, i) => {
-          const cell = ws.getCell(currentRow, baseCol + i);
+          const cell = ws.getCell(currentRow, baseCol + 1 + i);
           cell.value = val;
           cell.font = { bold: true, color: { argb: whiteARGB } };
           cell.fill = blackFill;
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
         });
       } else {
-        // Rellenar con fondo negro aunque no haya datos
         for (let i = 0; i < 4; i++) {
-          const cell = ws.getCell(currentRow, baseCol + i);
+          const cell = ws.getCell(currentRow, baseCol + 1 + i);
           cell.fill = blackFill;
         }
       }
     }
     
-    // FILAS DE JUGADORES (con desplazamiento por temática)
-    // Primero rellenar TODO el bloque con el color de fondo
+    // Rellenar todas las filas del bloque con el color de fondo
     for (let r = 1; r <= maxRows; r++) {
-      for (let c = 1; c <= 6 + (3 * 4); c++) {
+      for (let c = 1; c <= 6 + (3 * 5); c++) {
         const cell = ws.getCell(currentRow + r, c);
         if (blockFill) cell.fill = blockFill;
       }
     }
     
-    // Ahora colocar los jugadores en sus posiciones correctas
+    // Colocar jugadores en sus posiciones
     for (let thematicNum = 1; thematicNum <= 3; thematicNum++) {
-      const baseCol = 7 + ((thematicNum - 1) * 4);
+      const baseCol = 7 + ((thematicNum - 1) * 5);
       const thematicData = team.thematics[`thematic${thematicNum}`];
       
       if (thematicData) {
         thematicData.players.forEach((player, playerIdx) => {
           const playerRow = currentRow + 1 + (thematicNum - 1) + playerIdx;
           
-          // Nombre del jugador en la columna 2
-          const playerNameCell = ws.getCell(playerRow, 2);
+          // Nombre en la columna TEMA
+          const playerNameCell = ws.getCell(playerRow, baseCol);
           playerNameCell.value = player.name;
           playerNameCell.alignment = { horizontal: 'left', vertical: 'middle' };
           if (blockFill) playerNameCell.fill = blockFill;
           
-          // Estadísticas del jugador en las columnas de esta temática
+          // Estadísticas en T, S, P, A
           const playerStats = [player.points, player.scratches || '', player.palos || '', player.aces || ''];
           playerStats.forEach((val, i) => {
-            const cell = ws.getCell(playerRow, baseCol + i);
+            const cell = ws.getCell(playerRow, baseCol + 1 + i);
             cell.value = val;
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
             if (blockFill) cell.fill = blockFill;
@@ -3436,11 +3416,10 @@ function buildRelevosSheet(ws, results) {
       }
     }
     
-    // Avanzar al siguiente equipo
     currentRow += totalRowsForTeam;
   });
   
-  // Configurar anchos de columnas
+  // Configurar anchos
   ws.getColumn(1).width = posW;
   ws.getColumn(2).width = nameW;
   ws.getColumn(3).width = numW;
@@ -3449,11 +3428,12 @@ function buildRelevosSheet(ws, results) {
   ws.getColumn(6).width = numW;
   
   for (let i = 0; i < 3; i++) {
-    const baseCol = 7 + (i * 4);
-    ws.getColumn(baseCol).width = numW;
-    ws.getColumn(baseCol + 1).width = numW;
-    ws.getColumn(baseCol + 2).width = numW;
-    ws.getColumn(baseCol + 3).width = numW;
+    const baseCol = 7 + (i * 5);
+    ws.getColumn(baseCol).width = themeW;     // TEMA
+    ws.getColumn(baseCol + 1).width = numW;   // T
+    ws.getColumn(baseCol + 2).width = numW;   // S
+    ws.getColumn(baseCol + 3).width = numW;   // P
+    ws.getColumn(baseCol + 4).width = numW;   // A
   }
 }
 

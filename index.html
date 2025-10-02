@@ -3284,6 +3284,29 @@ function buildRelevosSheet(ws, results) {
 
   ws.views = [{ state: 'normal', showGridLines: false }];
 
+  // ===== ORDENACIÓN PREVIA =====
+  const teamSorter = (a, b) =>
+    (b.totalPoints   - a.totalPoints)   ||
+    (b.totalScratches- a.totalScratches)||
+    (b.totalAces     - a.totalAces)     ||
+    (b.totalPalos    - a.totalPalos);
+
+  const playerSorter = (a, b) =>
+    (b.points    - a.points)    ||
+    (b.scratches - a.scratches) ||
+    (b.aces      - a.aces)      ||
+    (b.palos     - a.palos);
+
+  // Ordena equipos
+  results.teams.sort(teamSorter);
+  // Ordena jugadores dentro de cada temática de cada equipo
+  results.teams.forEach(team => {
+    for (let i = 1; i <= 3; i++) {
+      const td = team.thematics?.[`thematic${i}`];
+      if (td?.players?.length) td.players.sort(playerSorter);
+    }
+  });
+
   // Cabeceras principales (solo una fila) - SIN "Equipo" ni "TEMA"
   const headers = ['Pos', '', 'T', 's', 'p', 'a'];
   results.themes.forEach(theme => {
@@ -3298,14 +3321,14 @@ function buildRelevosSheet(ws, results) {
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  // Escribir nombres de temáticas en la fila 1 (primera fila), alineados a la izquierda
+  // Escribir nombres de temáticas en la fila 1 (sin uppercasing), alineados a la **derecha**
   results.themes.forEach((themeName, themeIndex) => {
     const baseCol = 7 + (themeIndex * 5);
     const themeCell = ws.getCell(1, baseCol);
-    themeCell.value = themeName.toUpperCase();
+    themeCell.value = themeName; // ← tal cual lo introduce el usuario
     themeCell.font = { bold: true, color: { argb: whiteARGB } };
     themeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: blackARGB } };
-    themeCell.alignment = { horizontal: 'left', vertical: 'middle' };  // Alineado a la izquierda
+    themeCell.alignment = { horizontal: 'right', vertical: 'middle' }; // ← derecha
   });
 
   let currentRow = 2;
@@ -3401,11 +3424,12 @@ function buildRelevosSheet(ws, results) {
       const thematicData = team.thematics[`thematic${thematicNum}`];
 
       if (thematicData && thematicData.players.length > 0) {
+        // (Ya están ordenados por playerSorter arriba)
         thematicData.players.forEach((player) => {
-          // Nombre
+          // Nombre (alineado a la DERECHA, como pides)
           const playerNameCell = ws.getCell(playerRow, baseCol);
           playerNameCell.value = player.name;
-          playerNameCell.alignment = { horizontal: 'left', vertical: 'middle' };
+          playerNameCell.alignment = { horizontal: 'right', vertical: 'middle' }; // ← derecha
           if (blockFill) playerNameCell.fill = blockFill;
 
           // T, s, p, a
@@ -3419,8 +3443,6 @@ function buildRelevosSheet(ws, results) {
 
           playerRow++; // avanzar UNA fila por jugador
         });
-
-        // --- IMPORTANTE: sin "playerRow++" extra al terminar la temática ---
       }
     }
 
@@ -3445,6 +3467,7 @@ function buildRelevosSheet(ws, results) {
     ws.getColumn(baseCol + 4).width = numW;   // a
   }
 }
+
 
 
 /* ==================== FIN BLOQUE RELEVOS ===================== */

@@ -3361,7 +3361,7 @@ function buildRelevosSheet(ws, results) {
     teamCell.value = team.name;
     teamCell.font = { bold: true, color: { argb: teamColors.fg.replace('#','FF') } };
     teamCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: teamColors.bg.replace('#','FF') } };
-    teamCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    teamCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Totales generales
     const totals = [team.totalPoints, team.totalScratches, team.totalPalos, team.totalAces];

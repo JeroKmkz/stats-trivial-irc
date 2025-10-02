@@ -3099,8 +3099,8 @@ function parseRelevosLog(content, theme, logNumber) {
     teams[teamName] = points;
   }
   
-  // Extraer jugadores
-  const players = {};
+  // Extraer TODOS los jugadores (con y sin puntos)
+  const allPlayers = [];
   for (let i = playerStart + 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
@@ -3115,25 +3115,55 @@ function parseRelevosLog(content, theme, logNumber) {
     const scratches = isAbsent ? 0 : parseInt((line.match(/Scr:\s*(\d+)/i) || [0,0])[1], 10);
     const palos = isAbsent ? 0 : parseInt((line.match(/Palos:\s*(\d+)/i) || [0,0])[1], 10);
     
-    // Solo guardar si participó (tiene algún valor > 0)
-    const participated = points > 0 || aces > 0 || scratches > 0 || palos > 0;
+    allPlayers.push({
+      name: name,
+      points: points,
+      aces: aces,
+      scratches: scratches,
+      palos: palos,
+      participated: points > 0 || aces > 0 || scratches > 0 || palos > 0
+    });
+  }
+  
+  // Asignar equipos por orden alfabético
+  const teamsAlpha = Object.keys(teams).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  
+  let currentTeamIndex = 0;
+  let prevNick = '';
+  
+  allPlayers.forEach((player, index) => {
+    // Detectar salto alfabético = cambio de equipo
+    if (index > 0 && player.name.localeCompare(prevNick, 'es', { sensitivity: 'base' }) < 0) {
+      currentTeamIndex++;
+      if (currentTeamIndex >= teamsAlpha.length) {
+        currentTeamIndex = teamsAlpha.length - 1;
+      }
+    }
     
-    if (participated) {
-      players[name] = {
-        name: name,
-        points: points,
-        aces: aces,
-        scratches: scratches,
-        palos: palos
+    player.team = teamsAlpha[currentTeamIndex] || 'SinEquipo';
+    prevNick = player.name;
+  });
+  
+  // Filtrar solo los que participaron para el resultado final
+  const participatingPlayers = {};
+  allPlayers.forEach(player => {
+    if (player.participated) {
+      participatingPlayers[player.name] = {
+        name: player.name,
+        team: player.team,
+        points: player.points,
+        aces: player.aces,
+        scratches: player.scratches,
+        palos: player.palos
       };
     }
-  }
+  });
   
   return {
     theme: theme,
     logNumber: logNumber,
     teams: teams,
-    players: players
+    players: participatingPlayers
   };
 }
 
@@ -3178,30 +3208,9 @@ function processRelevosResults(logs, themes) {
       };
     });
     
-    // Asignar jugadores a equipos y acumular sus estadísticas
-    const teamNames = Object.keys(log.teams).sort((a, b) => 
-      a.localeCompare(b, 'es', { sensitivity: 'base' })
-    );
-    
-    const playerNames = Object.keys(log.players).sort((a, b) => 
-      a.localeCompare(b, 'es', { sensitivity: 'base' })
-    );
-    
-    let currentTeamIndex = 0;
-    let prevPlayerName = '';
-    
-    playerNames.forEach((playerName, index) => {
-      const playerData = log.players[playerName];
-      
-      // Detectar cambio de equipo por salto alfabético
-      if (index > 0 && playerName.localeCompare(prevPlayerName, 'es', { sensitivity: 'base' }) < 0) {
-        currentTeamIndex++;
-        if (currentTeamIndex >= teamNames.length) {
-          currentTeamIndex = teamNames.length - 1;
-        }
-      }
-      
-      const teamName = teamNames[currentTeamIndex];
+    // Asignar jugadores a equipos (ya vienen con el equipo asignado desde parseRelevosLog)
+    Object.entries(log.players).forEach(([playerName, playerData]) => {
+      const teamName = playerData.team;
       const team = allTeams[teamName];
       
       // Acumular estadísticas del equipo en esta temática

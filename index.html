@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Procesador de Logs de Trivial IRC — Liga (estanca) + GP</title>
+  <title>Procesador de Puntos de Trivial-IRC</title>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <style>
@@ -28,7 +28,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🎯 Procesador de Logs de Trivial IRC</h1>
+    <h1>🎯 Procesador de Puntos de Trivial-IRC</h1>
 
     <!-- SELECCIÓN DE COMPETICIÓN -->
     <div class="competition-select">
@@ -646,9 +646,32 @@ async function downloadExcel_LIGA(){
       const teams = matchData.teamOrder.map(teamName => ({
         name: teamName,
         points: matchData.teams[teamName],
-        players: matchData.players.filter(p=>p.team===teamName).sort((a,b)=>{
-          if (a.absent && !b.absent) return 1; if(!a.absent && b.absent) return -1; return (b.points||0)-(a.points||0);
-        }),
+        players: matchData.players
+          .filter(p => p.team === teamName)
+          .sort((a, b) => {
+            // ausentes siempre al final
+            if (a.absent && !b.absent) return 1;
+            if (!a.absent && b.absent) return -1;
+        
+            // 1) puntos (desc)
+            const diffPts = (b.points || 0) - (a.points || 0);
+            if (diffPts) return diffPts;
+        
+            // 2) scratches (desc)
+            const diffScr = (b.scratches || 0) - (a.scratches || 0);
+            if (diffScr) return diffScr;
+        
+            // 3) aces (desc)
+            const diffAce = (b.aces || 0) - (a.aces || 0);
+            if (diffAce) return diffAce;
+        
+            // 4) palos (desc)
+            const diffPal = (b.palos || 0) - (a.palos || 0);
+            if (diffPal) return diffPal;
+        
+            // 5) alfabético (asc)
+            return String(a.name).localeCompare(String(b.name), 'es', { sensitivity: 'base' });
+          }),
         colors: COLORES_EQUIPOS[teamName] || { bg:'#CCCCCC', fg:'#000000' }
       }));
 
@@ -724,13 +747,19 @@ async function downloadExcel_LIGA(){
 
     if (processedData.length>0){
       const tcount=processedData[0].teamOrder.length;
-      const widths=[3];
-      for(let i=0;i<tcount;i++){
-        widths.push(widthFromPx(121), 8, 10, 8, 8);
-        if(i<tcount-1) widths.push(6);
+      const MARGIN_21 = widthFromPx(21);
+      const widths = [MARGIN_21]; // margen izquierdo 21 px
+      
+      for (let i = 0; i < tcount; i++) {
+        widths.push(widthFromPx(121), 8, 10, 8, 8); // NOMBRE + numéricas
+        if (i < tcount - 1) widths.push(6);         // separador entre equipos
       }
-      const wsCols = widths.map(w=>({width:w}));
-      ws.columns = wsCols;
+      
+      // margen derecho 21 px (nuevo)
+      widths.push(MARGIN_21);
+      
+      ws.columns = widths.map(w => ({ width: w }));
+
       // margen superior e inferior
       ws.spliceRows(1, 0, []); ws.addRow([]);
     }
@@ -2396,13 +2425,16 @@ function addIndividualRanking(ws, allPlayers, teams, startRowParam = 1) {
       const pointsDiff = (b.points||0) - (a.points||0);
       if (pointsDiff !== 0) return pointsDiff;
       
-      const acesDiff = (b.aces||0) - (a.aces||0);
-      if (acesDiff !== 0) return acesDiff;
-      
       const scratchesDiff = (b.scratches||0) - (a.scratches||0);
       if (scratchesDiff !== 0) return scratchesDiff;
       
-      return (b.palos||0) - (a.palos||0);
+      const acesDiff = (b.aces||0) - (a.aces||0);
+      if (acesDiff !== 0) return acesDiff;
+      
+      const palosDiff = (b.palos||0) - (a.palos||0);
+      if (palosDiff !== 0) return palosDiff;
+      
+      return a.name.localeCompare(b.name, 'es', {sensitivity: 'base'});
     })
     .slice(0, 20);
   

@@ -776,11 +776,17 @@ async function downloadExcel_LIGA(){
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url;
-  if (currentProcess==='jornada'){
-    const base = fileNames.map(n=>n.replace(/\.txt$/,'')).join('_');
-    a.download = `Jornada_${base}.xlsx`;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const fileCount = fileNames.length; // nº de archivos subidos
+  
+  if (currentProcess === 'jornada') {
+    // 🟢 Excel de jornada individual
+    a.download = `Jornada_${today}.xlsx`;
+  
   } else {
-    a.download = `Totales_Liga_${new Date().toISOString().slice(0,10)}.xlsx`;
+    // 🟢 Excel de totales: incluye cantidad de jornadas (J1, J2, J3...)
+    const jornadaLabel = `J${fileCount}`;
+    a.download = `Totales_Liga_${jornadaLabel}_${today}.xlsx`;
   }
   a.click(); URL.revokeObjectURL(url);
   showSuccess(`Excel generado correctamente – ${currentProcess==='jornada'?'Estadísticas de Jornada':'Totales Liga'}`);

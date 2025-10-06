@@ -227,7 +227,43 @@
               </select>
             </div>
           </div>
-        </div>  
+        </div>
+
+      <!-- PLAYOFF (solo para LIGA) -->
+      <div id="playoffBox" style="display:none; margin-left:auto; padding:8px 12px; border:1px solid #ddd; border-radius:8px; background:#fafafa;">
+        <label style="display:inline-flex; align-items:center; gap:6px; margin-bottom:6px;">
+          <input type="checkbox" id="poToggle"> Generar Cuadro Playoff
+        </label>
+    
+        <div id="poForm" style="display:none; margin-top:6px;">
+          <div style="margin-bottom:8px;">
+            <label for="poTitle"><b>Título:</b></label>
+            <input id="poTitle" type="text" placeholder="PLAY OFFS TORNEO..." style="width:280px; padding:4px 6px; margin-left:6px;">
+          </div>
+    
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; align-items:center;">
+            <div><b>Semifinalista 1</b></div>
+            <div><b>Semifinalista 2</b></div>
+            <select id="poSF1A"></select>
+            <select id="poSF1B"></select>
+    
+            <div><b>Semifinalista 3</b></div>
+            <div><b>Semifinalista 4</b></div>
+            <select id="poSF2A"></select>
+            <select id="poSF2B"></select>
+    
+            <div><b>Finalista 1</b></div>
+            <div><b>Finalista 2</b></div>
+            <select id="poF1"></select>
+            <select id="poF2"></select>
+    
+            <div><b>Campeón</b></div>
+            <div></div>
+            <select id="poChampion"></select>
+            <div></div>
+          </div>
+        </div>
+      </div>
       
     </div>
 
@@ -344,7 +380,28 @@ document.addEventListener('DOMContentLoaded', () => {
 function onCompetitionChange(){
   competitionType = document.getElementById('competitionSelect').value;
   const gpBox = document.getElementById('gpRoundBox');
+  // Playoff UI refs
+  const poBox = document.getElementById('playoffBox');
+  const poToggle = document.getElementById('poToggle');
+  const poForm = document.getElementById('poForm');
+  
+  // Construye opciones de selects de playoff
+  initPlayoffUI();
+  
+  // Mostrar/ocultar formulario según el checkbox
+  poToggle.addEventListener('change', () => {
+    poForm.style.display = poToggle.checked ? '' : 'none';
+  });
   gpBox.style.display = (competitionType==='gp') ? 'inline-block' : 'none';
+  // Playoff visible solo en LIGA
+  const poBox = document.getElementById('playoffBox');
+  const poForm = document.getElementById('poForm');
+  const isLiga = (competitionType === 'liga');
+  poBox.style.display = isLiga ? '' : 'none';
+  if (!isLiga) {
+    document.getElementById('poToggle').checked = false;
+    poForm.style.display = 'none';
+  }
 
   // Cambiar textos según el tipo de competición
   const title = document.getElementById('totalesTitle');
@@ -424,6 +481,42 @@ const COLORES_EQUIPOS = {
   "HARDBE@TS": {"bg": "#000000", "fg": "#FFFF00"},
   "LIDERES": {"bg": "#C000C0", "fg": "#FFFFFF"}
 };
+
+function initPlayoffUI(){
+  const teams = Object.keys(COLORES_EQUIPOS).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+  const fill = (sel, withEmpty=false) => {
+    const el = document.getElementById(sel);
+    if (!el) return;
+    el.innerHTML = '';
+    // Semis NO llevan VACÍO; Final y Campeón SÍ
+    if (withEmpty){
+      const opt = document.createElement('option');
+      opt.value = ''; opt.textContent = 'VACÍO';
+      el.appendChild(opt);
+    }
+    teams.forEach(t=>{
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t; el.appendChild(o);
+    });
+  };
+  // Semifinalistas (sin VACÍO)
+  ['poSF1A','poSF1B','poSF2A','poSF2B'].forEach(id=>fill(id,false));
+  // Finalistas y campeón (con VACÍO)
+  ['poF1','poF2','poChampion'].forEach(id=>fill(id,true));
+}
+
+function collectPlayoffSelections(){
+  return {
+    title: document.getElementById('poTitle')?.value?.trim() || '',
+    sf1a: document.getElementById('poSF1A')?.value || '',
+    sf1b: document.getElementById('poSF1B')?.value || '',
+    sf2a: document.getElementById('poSF2A')?.value || '',
+    sf2b: document.getElementById('poSF2B')?.value || '',
+    f1:   document.getElementById('poF1')?.value   || '',
+    f2:   document.getElementById('poF2')?.value   || '',
+    champ:document.getElementById('poChampion')?.value || ''
+  };
+}
 
 function xlsToString(v){ if (v == null) return ''; if (typeof v === 'string') return v; if (typeof v === 'number') return String(v); if (v.richText) return v.richText.map(t=>t.text).join(''); if (v.text) return v.text; if (v.result != null) return xlsToString(v.result); return String(v); }
 function norm(v){ return xlsToString(v).trim().toUpperCase(); }
@@ -772,6 +865,13 @@ async function downloadExcel_LIGA(){
     generateTotalsTeamsSheet(ws2, 14); // <- aquí ajustamos AVG de PUNTOS/POSTES/SCRATCHES a 59 px
   }
 
+  // Si está marcado "Generar Cuadro Playoff", añadimos hoja 'Playoff'
+  if (competitionType === 'liga' && document.getElementById('poToggle')?.checked) {
+    const po = collectPlayoffSelections();
+    const wsPO = wb.addWorksheet('Playoff', { views: [{ state:'normal', showGridLines:false }] });
+    buildPlayoffSheet(wsPO, po);
+  }
+
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -1017,6 +1117,53 @@ function generateTotalsTeamsSheet(ws, fontSize = 14){
   ];
   // Márgenes arriba/abajo
   ws.spliceRows(1, 0, []); ws.addRow([]);
+}
+
+function buildPlayoffSheet(ws, po){
+  // Layout básico: columnas para SEMIS, FINAL, CAMPEÓN
+  const title = po.title || 'PLAY OFFS';
+  ws.getCell(1,2).value = title;
+  ws.getCell(1,2).font = { bold:true, size:16 };
+  ws.getCell(1,2).alignment = { horizontal:'left' };
+
+  // cabeceras
+  ws.getCell(3,2).value = 'SEMIS';
+  ws.getCell(3,8).value = 'FINAL';
+  ws.getCell(3,14).value = 'CAMPEÓN';
+  [ [3,2], [3,8], [3,14] ].forEach(([r,c])=>{
+    const ce = ws.getCell(r,c); ce.font = { bold:true }; ce.alignment = { horizontal:'center' };
+  });
+
+  // helper para pintar “caja equipo”
+  const box = (r,c, teamName) => {
+    const w = 4; // ancho 4 columnas
+    const colors = COLORES_EQUIPOS[teamName] || { bg:'#5B0066', fg:'#FFFFFF' };
+    for(let j=0;j<w;j++){
+      const cell = ws.getCell(r, c+j);
+      cell.value = (j===1 && teamName) ? teamName : '';
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+      cell.font = { bold:true, color:{ argb: (teamName? colors.fg : '#FFFFFFFF').replace('#','FF') } };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: (teamName? colors.bg : '#FFFFFF').replace('#','FF') } };
+    }
+  };
+
+  // SEMIS (dos llaves)
+  box(5, 2, po.sf1a); // arriba izq
+  box(6, 2, po.sf1b);
+  box(11,2, po.sf2a); // abajo izq
+  box(12,2, po.sf2b);
+
+  // FINAL (dos posibles)
+  box(7, 8, po.f1 || ''); // si VACÍO → caja clara sin texto
+  box(12,8, po.f2 || '');
+
+  // CAMPEÓN (una sola)
+  box(8, 14, po.champ || '');
+
+  // anchos y alturas
+  const widthFromPx = (px)=> +(px/7).toFixed(2);
+  for (let col=1; col<=18; col++) ws.getColumn(col).width = widthFromPx(36);
+  [5,6,7,8,11,12].forEach(r=> ws.getRow(r).height = 20);
 }
 
 // Parser LIGA desde TXT

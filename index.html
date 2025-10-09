@@ -429,9 +429,9 @@ function buildPlayoffSheet(ws, po){
 
   // Cabeceras
   ws.getCell(3,3).value='SEMIS';
-  ws.getCell(3,9).value='FINAL';
-  ws.getCell(3,15).value='CAMPEÓN';
-  [[3,3],[3,9],[3,15]].forEach(([r,c])=>{ const ce=ws.getCell(r,c); ce.font={bold:true}; ce.alignment={horizontal:'center'}; });
+  ws.getCell(3,7).value='FINAL';
+  ws.getCell(3,11).value='CAMPEÓN';
+  [[3,3],[3,7],[3,11]].forEach(([r,c])=>{ const ce=ws.getCell(r,c); ce.font={bold:true}; ce.alignment={horizontal:'center'}; });
 
   // Caja helper
   const box = (r,c,teamName)=>{
@@ -450,17 +450,25 @@ function buildPlayoffSheet(ws, po){
   box(11, 3, po.sf2a);
   box(12, 3, po.sf2b);
   
-  // Final (columna 9)
-  box(7,  9, po.f1 || '');
-  box(12, 9, po.f2 || '');
+  // Final (columna 7)
+  box(7,  7, po.f1 || '');
+  box(10, 7, po.f2 || '');
   
-  // Campeón (columna 15)
-  box(8, 15, po.champ || '');
+  // Campeón (columna 11)
+  box(8, 11, po.champ || '');
 
-  // Columnas de rótulos y nombres (SEMIS/FINAL/CAMPEÓN) a 100 px
-  ws.getColumn(3).width  = widthFromPx(100);
-  ws.getColumn(9).width  = widthFromPx(100);
-  ws.getColumn(15).width = widthFromPx(100);
+  // Columnas de SEMIS, FINAL y CAMPEÓN a 100 px
+  if (typeof widthFromPx === 'function') {
+    ws.getColumn(3).width  = widthFromPx(100);
+    ws.getColumn(7).width  = widthFromPx(100);
+    ws.getColumn(11).width = widthFromPx(100);
+  } else {
+    // fallback si no tienes widthFromPx en este scope
+    const px = v => +(v/7).toFixed(2);
+    ws.getColumn(3).width  = px(100);
+    ws.getColumn(7).width  = px(100);
+    ws.getColumn(11).width = px(100);
+  }
 
   // Anchos/alturas
   const widthFromPxLocal = (px)=> +(px/7).toFixed(2);

@@ -428,41 +428,47 @@ function buildPlayoffSheet(ws, po){
   ws.getCell(1,2).alignment = { horizontal:'left' };
 
   // Cabeceras
-  ws.getCell(3,2).value='SEMIS';
-  ws.getCell(3,8).value='FINAL';
-  ws.getCell(3,14).value='CAMPEÓN';
-  [[3,2],[3,8],[3,14]].forEach(([r,c])=>{ const ce=ws.getCell(r,c); ce.font={bold:true}; ce.alignment={horizontal:'center'}; });
+  ws.getCell(3,3).value='SEMIS';
+  ws.getCell(3,9).value='FINAL';
+  ws.getCell(3,15).value='CAMPEÓN';
+  [[3,3],[3,9],[3,15]].forEach(([r,c])=>{ const ce=ws.getCell(r,c); ce.font={bold:true}; ce.alignment={horizontal:'center'}; });
 
   // Caja helper
   const box = (r,c,teamName)=>{
-    const w=4; const has=!!teamName;
-    const colors = has ? (COLORES_EQUIPOS[teamName] || { bg:'#5B0066', fg:'#FFFFFF' }) : { bg:'#FFFFFF', fg:'#000000' };
-    for(let j=0;j<w;j++){
-      const cell = ws.getCell(r, c+j);
-      cell.value = (j===1 && has)? teamName : '';
-      cell.alignment = { horizontal:'center', vertical:'middle' };
-      cell.font = { bold:true, color:{ argb: toARGB(colors.fg) } };
-      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: toARGB(colors.bg) } };
-    }
-  };
+  const has = !!teamName;
+  const colors = has ? (COLORES_EQUIPOS[teamName] || { bg:'#5B0066', fg:'#FFFFFF' }) : { bg:'#FFFFFF', fg:'#000000' };
+  const cell = ws.getCell(r, c);
+  cell.value = has ? teamName : '';
+  cell.alignment = { horizontal:'center', vertical:'middle' };
+  cell.font = { bold:true, color:{ argb: toARGB(colors.fg) } };
+  cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb: toARGB(colors.bg) } };
+};
 
-  // Semis
-  box(5, 2,  po.sf1a);
-  box(6, 2,  po.sf1b);
-  box(11,2,  po.sf2a);
-  box(12,2,  po.sf2b);
+  // Semis (columna 3)
+  box(5,  3, po.sf1a);
+  box(6,  3, po.sf1b);
+  box(11, 3, po.sf2a);
+  box(12, 3, po.sf2b);
+  
+  // Final (columna 9)
+  box(7,  9, po.f1 || '');
+  box(12, 9, po.f2 || '');
+  
+  // Campeón (columna 15)
+  box(8, 15, po.champ || '');
 
-  // Final
-  box(7, 8,  po.f1 || '');
-  box(12,8,  po.f2 || '');
-
-  // Campeón
-  box(8, 14, po.champ || '');
+  // Columnas de rótulos y nombres (SEMIS/FINAL/CAMPEÓN) a 100 px
+  ws.getColumn(3).width  = widthFromPx(100);
+  ws.getColumn(9).width  = widthFromPx(100);
+  ws.getColumn(15).width = widthFromPx(100);
 
   // Anchos/alturas
   const widthFromPxLocal = (px)=> +(px/7).toFixed(2);
   for(let col=1; col<=20; col++) ws.getColumn(col).width = widthFromPxLocal(36);
-  [5,6,7,8,11,12].forEach(r=> ws.getRow(r).height = 20);
+  
+  // Altura por defecto para semis/final (no tocar).
+  // Campeón (fila 8) más grande: 40 px
+  ws.getRow(8).height = 40;
 }
 
 async function generatePlayoffExcel(){

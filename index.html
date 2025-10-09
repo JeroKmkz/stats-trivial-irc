@@ -461,10 +461,10 @@ function buildPlayoffSheet(ws, po){
   const px = v => +(v/7).toFixed(2);
   for (let col = 1; col <= 20; col++) ws.getColumn(col).width = px(36);
   
-  // Forzar 100 px en las columnas de SEMIS, FINAL y CAMPEÓN (debe ir DESPUÉS del bucle anterior)
-  ws.getColumn(3).width  = px(100);
-  ws.getColumn(7).width  = px(100);
-  ws.getColumn(11).width = px(100);
+  // Forzar ancho personalizado en columnas de SEMIS, FINAL y CAMPEÓN (DESPUÉS del bucle general)
+  ws.getColumn(3).width  = px(120);  // SEMIS
+  ws.getColumn(7).width  = px(120);  // FINAL
+  ws.getColumn(11).width = px(140); // CAMPEÓN
   
   // Altura por defecto para semis/final (no tocar).
   // Campeón (fila 8) más grande: 40 px

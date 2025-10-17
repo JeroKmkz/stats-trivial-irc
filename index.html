@@ -1506,7 +1506,7 @@ function processFinalResults(logs, themes) {
   
 function buildGPSheet(ws, groups){
   const leftMarginCols = 1, betweenGroupsCols = 4, rightMarginCols = 1;
-  const marginW = widthFromPx(24);
+  const marginW = widthFromPx(25);
   const nameW   = widthFromPx(150);
   const numW    = widthFromPx(40);
   const bandARGB = 'FF0B7D7D';
@@ -1569,14 +1569,14 @@ function buildGPSheet(ws, groups){
       ws.mergeCells(headerRow, sepStart, headerRow, sepEnd);
       const themeCell = ws.getCell(headerRow, sepStart);
       themeCell.value = gpTheme ? gpTheme.toUpperCase() : '';
-      themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    
-      // Dos puntos menos que el tamaño de cabecera habitual: si no defines tamaño en cabecera,
-      // usa 12 como base y ponemos 10 aquí. (Si tú usas 14 en cabecera, pon 12 aquí).
-      themeCell.font = { bold: true, size: 10 };
-      // Sin bordes y sin relleno
+      themeCell.alignment = { horizontal:'center', vertical:'middle' };
+      
+      // Colores: fondo negro, texto blanco
+      const themeBgARGB = 'FF000000';
+      const themeFgARGB = 'FFFFFFFF';
+      themeCell.font = { bold:true, size: 10, color: { argb: themeFgARGB } };
+      themeCell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: themeBgARGB } };
       themeCell.border = {};
-      themeCell.fill = undefined;
     }
 
     // Datos (sin bordes)

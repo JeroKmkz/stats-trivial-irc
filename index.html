@@ -1514,6 +1514,8 @@ function buildGPSheet(ws, groups){
 
   const gpRound = Math.min(Math.max(parseInt(document.getElementById('gpRoundSelect')?.value || '1',10),1),5);
   const GPP_LABEL = `GP${gpRound}`;
+  // Temática seleccionada (para cabecera entre grupos)
+  const gpTheme = (document.getElementById('gpThemeSelect')?.value || '').toString();
 
   ws.views = [{ state: 'normal', showGridLines: false }];
 
@@ -1522,7 +1524,9 @@ function buildGPSheet(ws, groups){
   try { ws.getRow(1).height = 7.5; } catch {}
 
   // Columnas totales
-  const totalCols = leftMarginCols + (groups.length * 6) + ((groups.length - 1) * betweenGroupsCols) + rightMarginCols;
+  // Reservamos al menos 1 bloque separador para poder pintar la temática incluso con 1 solo grupo
+  const sepBlocks = Math.max(1, groups.length - 1);
+  const totalCols = leftMarginCols + (groups.length * 6) + (sepBlocks * betweenGroupsCols) + rightMarginCols;
   ws.columns = Array.from({length: totalCols}, ()=>({ width: 11 }));
 
   // Márgenes laterales
@@ -1549,6 +1553,31 @@ function buildGPSheet(ws, groups){
     // Anchos
     ws.getColumn(baseCol).width = nameW;
     for (let off=1; off<=5; off++) ws.getColumn(baseCol+off).width = numW;
+
+    // --- Tema en el primer separador de 4 columnas (siempre):
+    // posición = justo a continuación de las 6 columnas del primer grupo
+    if (idx === 0) {
+      const sepStart = baseCol + 6;                    // primera columna del separador
+      const sepEnd   = sepStart + betweenGroupsCols - 1; // 4 columnas
+    
+      // Asegurar ancho “estrecho” del separador
+      for (let c = sepStart; c <= sepEnd; c++) {
+        ws.getColumn(c).width = marginW; // ya usas marginW (~24 px)
+      }
+    
+      // Combinar y centrar el texto de la temática
+      ws.mergeCells(headerRow, sepStart, headerRow, sepEnd);
+      const themeCell = ws.getCell(headerRow, sepStart);
+      themeCell.value = gpTheme ? gpTheme.toUpperCase() : '';
+      themeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+      // Dos puntos menos que el tamaño de cabecera habitual: si no defines tamaño en cabecera,
+      // usa 12 como base y ponemos 10 aquí. (Si tú usas 14 en cabecera, pon 12 aquí).
+      themeCell.font = { bold: true, size: 10 };
+      // Sin bordes y sin relleno
+      themeCell.border = {};
+      themeCell.fill = undefined;
+    }
 
     // Datos (sin bordes)
     let r = dataStartRow;
@@ -1597,35 +1626,7 @@ function buildGPSheet(ws, groups){
     } else {
       baseCol += 6;
     }
-  });
-
-  // Añadir información de temática al final
-  const selectedTheme = document.getElementById('gpThemeSelect')?.value;
-  if (selectedTheme) {
-    // Encontrar la fila más baja con datos
-    let lastDataRow = 2; // Empezar desde la fila de cabeceras
-    groups.forEach(g => {
-      const groupLastRow = 3 + (g.players?.length || 0);
-      if (groupLastRow > lastDataRow) {
-        lastDataRow = groupLastRow;
-      }
-    });
-    
-    // Añadir 1 fila de separación
-    const themeRow = lastDataRow + 1;
-    
-    // Celda "Temática:" en la columna 2
-    const labelCell = ws.getCell(themeRow, 2);
-    labelCell.value = 'Temática:';
-    labelCell.font = { bold: true };
-    labelCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    
-    // Celda con la temática seleccionada en la columna 3
-    const themeCell = ws.getCell(themeRow, 3);
-    themeCell.value = selectedTheme.toUpperCase();
-    themeCell.font = { bold: true };
-    themeCell.alignment = { horizontal: 'left', vertical: 'middle' };
-  }
+  });  
 
   // Config impresión
   try {

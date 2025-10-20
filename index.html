@@ -1341,12 +1341,9 @@ function processJornada_GP(){
     
     processJornada_GP_Final(files, themes);
   } else {
-    // Procesar GP normal - validar temática única
-    const selectedTheme = document.getElementById('gpThemeSelect')?.value;
-    if (!selectedTheme) {
-      return showError('Por favor, selecciona una temática antes de procesar el GP');
-    }
-    
+    // Procesar GP normal – permitir temática vacía ("Ninguna")
+    const selectedTheme = (document.getElementById('gpThemeSelect')?.value || '').trim();
+    // Sin bloqueo: si está vacío, seguimos igualmente
     processJornada_GP_Normal(files, selectedTheme);
   }
 }

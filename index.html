@@ -1580,6 +1580,7 @@ function buildGPSheet(ws, groups){
         themeCell.font = { bold:true, size: 10, color: { argb: themeFgARGB } };
         themeCell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: themeBgARGB } };
       }
+    }
     // Datos (sin bordes)
     let r = dataStartRow;
     const putStat = (col, val, present, isPTS = false) => {

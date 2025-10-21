@@ -3759,12 +3759,28 @@ function puntosPorPos(pos){
 function parsePosLog(text, filename=''){
   const lines = String(text).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
 
-  // El label del grupo lo deducimos del nombre de archivo si aparece 123 / 456 / 78910
-  // o, si no, usamos un genérico.
-  let label = '1º·2º·3º';
-  const f = filename.toLowerCase();
-  if (/\b456\b/.test(f)) label = '4º·5º·6º';
-  else if (/\b78910\b/.test(f) || /\b789(10)?\b/.test(f)) label = '7º·8º·9º·10º';
+    // 1) Intentar deducir el grupo por el CONTENIDO del log:
+    //    - "Primeros/Segundos/Terceros"  => 1º·2º·3º
+    //    - "Cuartos/Quintos/Sextos"      => 4º·5º·6º
+    //    - "Septimos/Octavos/Novenos/Decimos" => 7º·8º·9º·10º
+    //    (Los textos aparecen bajo "CLASIFICACION EQUIPOS" en los logs de ejemplo)
+    //    Ej: "Primeros / Segundos / Terceros" :contentReference[oaicite:0]{index=0}
+    //        "Sextos / Cuartos / Quintos"    :contentReference[oaicite:1]{index=1}
+    //        "Novenos/Decimos / Septimos / Octavos" :contentReference[oaicite:2]{index=2}
+    const hay123 = lines.some(l => /primeros|segundos|terceros/i.test(l));
+    const hay456 = lines.some(l => /cuartos|quintos|sextos/i.test(l));
+    const hay78910 = lines.some(l => /septimos|octavos|novenos\/?decimos/i.test(l));
+  
+    let label = '1º·2º·3º';
+    if (hay78910) label = '7º·8º·9º·10º';
+    else if (hay456) label = '4º·5º·6º';
+    else if (hay123) label = '1º·2º·3º';
+    else {
+      // 2) Si por contenido no se puede, usar el nombre de archivo como antes
+      const f = filename.toLowerCase();
+      if (/\b456\b/.test(f)) label = '4º·5º·6º';
+      else if (/\b78910\b/.test(f) || /\b789(10)?\b/.test(f)) label = '7º·8º·9º·10º';
+    }
 
   const players = [];
 
@@ -3878,7 +3894,7 @@ function processJornada_POS(){
 
 // Construcción de hoja Posiciones (diseño similar a tu captura)
 function buildPOSSheet(ws, groups){
-  const leftMarginCols = 1, betweenGroupsCols = 4, rightMarginCols = 1;
+  const leftMarginCols = 1, betweenGroupsCols = 2, rightMarginCols = 1;
   const marginW = widthFromPx(24);
   const nameW   = widthFromPx(150);
   const numW    = widthFromPx(40);
@@ -3932,8 +3948,15 @@ function buildPOSSheet(ws, groups){
       const cPP = ws.getCell(r, baseCol+1);
       cPP.value = (p.pp ?? 0); cPP.font = { bold:true };
       cPP.alignment = { horizontal:'center', vertical:'middle' };
+      // Borde alrededor de toda la celda de PP
+      cPP.border = {
+        top:    { style:'thin' },
+        bottom: { style:'thin' },
+        left:   { style:'thin' },
+        right:  { style:'thin' }
+      };
 
-      putStat(baseCol+2, p.pts, true, true);     // PTS: mostrar 0
+      putStat(baseCol+2, p.pts, p.present, true); // PTS: si ausente ⇒ vacío; si presente ⇒ muestra incluso 0
       putStat(baseCol+3, p.pal, p.present, false); // PO: ocultar 0 si ausente/0
       putStat(baseCol+4, p.scr, p.present, false); // SC
       putStat(baseCol+5, p.ace, p.present, false); // AC

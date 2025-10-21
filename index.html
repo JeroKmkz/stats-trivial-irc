@@ -40,7 +40,7 @@
         <option value="copa">Copa</option>
         <option value="relevos">Torneo Relevos</option>
         <option value="master">Máster por Equipos</option>
-        <option value="posiciones" disabled>Torneo Posiciones (próx.)</option>
+        <option value="posiciones">Torneo Posiciones</option>
       </select>
 
       <!-- Selector de jornada GP (visible solo en GP) -->
@@ -356,6 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
   bJ.addEventListener('click', () => {
     if (competitionType === 'gp') {
       processJornada_GP();
+    } else if (competitionType === 'posiciones') {
+      processJornada_POS();
     } else if (competitionType === 'copa') {
       processJornada_COPA();
     } else if (competitionType === 'master') {
@@ -374,6 +376,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         downloadExcel_GP();
       }
+    } else if (competitionType === 'posiciones') {
+      downloadExcel_POS();
     } else if (competitionType === 'copa') {
       downloadExcel_COPA();
     } else if (competitionType === 'master') {
@@ -515,6 +519,10 @@ function onCompetitionChange(){
     title.textContent = '🏆 Máster por Equipos';
     desc.textContent = 'Sube el log (.txt) del Máster por Equipos para generar estadísticas';
     btn.textContent = 'Generar Máster';
+  } else if (competitionType === 'posiciones') {
+    title.textContent = '🏆 Torneo Posiciones (sin totales)';
+    desc.textContent  = 'Sube los 3 logs (1º-2º-3º | 4º-5º-6º | 7º-8º-9º-10º) y pulsa Procesar Jornada';
+    btn.textContent   = 'Totales desactivado';
   } else {
     title.textContent = '🏆 Totales y Medias Liga';
     desc.textContent = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
@@ -531,7 +539,7 @@ function onCompetitionChange(){
   const btnTot = document.getElementById('processTotalesBtn');
   const btnJor = document.getElementById('processJornadaBtn');
   
-  if (competitionType === 'copa' || competitionType === 'master' || competitionType === 'playoff') {
+  if (competitionType === 'copa' || competitionType === 'master' || competitionType === 'posiciones'|| competitionType === 'playoff') {
     if (btnTot) { btnTot.disabled = true; btnTot.style.opacity = '0.5'; }
   } else {
     if (btnTot) { btnTot.disabled = !(inT.files && inT.files.length); btnTot.style.opacity = '1'; }
@@ -3734,7 +3742,247 @@ function buildRelevosSheet(ws, results) {
   }
 }
 
+/* ================================================================
+   =====================  BLOQUE POSICIONES  ======================
+   ================================================================ */
 
+/* Tabla de puntos por posición (1..∞):
+   1:20, 2:17, 3:14, 4:12, 5:10, 6:9, 7:8, 8:7, 9:6, 10:5, 11:4, 12+:3 */
+const POS_TABLE = [20,17,14,12,10,9,8,7,6,5,4]; // índices 0..10 => pos 1..11
+function puntosPorPos(pos){
+  if (pos <= 0) return 0;
+  if (pos <= 11) return POS_TABLE[pos-1];
+  return 3; // 12 en adelante
+}
+
+// Parse de un log de Posiciones → {label, players:[{name, pts, pal, scr, ace, present, pos, pp}]}
+function parsePosLog(text, filename=''){
+  const lines = String(text).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+
+  // El label del grupo lo deducimos del nombre de archivo si aparece 123 / 456 / 78910
+  // o, si no, usamos un genérico.
+  let label = '1º·2º·3º';
+  const f = filename.toLowerCase();
+  if (/\b456\b/.test(f)) label = '4º·5º·6º';
+  else if (/\b78910\b/.test(f) || /\b789(10)?\b/.test(f)) label = '7º·8º·9º·10º';
+
+  const players = [];
+
+  for (const L of lines){
+    if (/^CLASIFICACION\s+EQUIPOS/i.test(L)) continue;
+    if (/^CLASIFICACION\s+INDIVIDUAL/i.test(L)) continue;
+
+    // Ausente
+    const mAbs = L.match(/^(\S[\S ]*?)\s+0\s+.*NO\s+ESTUVO\s+PRESENTE/i) ||
+                 L.match(/^(\S[\S ]*?)\s+NO\s+ESTUVO\s+PRESENTE/i);
+    if (mAbs){
+      const name = mAbs[1].trim();
+      if (name) players.push({ name: name.toUpperCase(), pts:0, pal:0, scr:0, ace:0, present:false, pos:0, pp:0 });
+      continue;
+    }
+
+    // Presente: "NICK  PTS  Aces:X  Scr:Y  Palos:Z"
+    const m = L.match(/^(.+?)\s+(-?\d+)\s+(?:Aces:\s*(-?\d+))?\s+Scr:\s*(-?\d+)\s+Palos:\s*(-?\d+)/i);
+    if (m){
+      const name = (m[1]||'').trim();
+      if (!name) continue;
+      players.push({
+        name: name.toUpperCase(),
+        pts:  parseInt(m[2]||'0',10),
+        ace:  parseInt(m[3]||'0',10),
+        scr:  parseInt(m[4]||'0',10),
+        pal:  parseInt(m[5]||'0',10),
+        present: true, pos:0, pp:0
+      });
+    }
+  }
+
+  // Ranking SOLO presentes (por PTS desc, SCR desc, ACE desc, PAL desc, nombre)
+  const present = players.filter(p=>p.present).sort((a,b)=>
+      (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace) || (b.pal - a.pal) ||
+      String(a.name).localeCompare(String(b.name),'es',{sensitivity:'base'})
+  );
+
+  // Asignar posiciones con empates (posición compartida por mismo PTS; el desempate a efectos
+  // de “lista visual” lo resolvemos con SCR/ACE/PAL/nombre, pero la posición para PP
+  // se basa en los bloques de igual PTS, como pediste)
+  for (let i=0, pos=1; i<present.length; ){
+    let j=i+1;
+    while (j<present.length && present[j].pts===present[i].pts) j++;
+    for (let k=i;k<j;k++) present[k].pos = pos; // misma posición al bloque
+    pos += (j-i); i = j;
+  }
+
+  // Calcular PP (media de puntos de las posiciones compartidas)
+  for (let i=0; i<present.length; ){
+    const startPos = present[i].pos;
+    let j=i+1; while (j<present.length && present[j].pos===startPos) j++;
+    const endPos = startPos + (j-i) - 1;
+    const vals = [];
+    for (let r=startPos; r<=endPos; r++) vals.push(puntosPorPos(r));
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    for (let k=i;k<j;k++) present[k].pp = +avg.toFixed(2);
+    i = j;
+  }
+
+  // Mapear PP/pos a players; ausentes → pp=0
+  const map = Object.fromEntries(present.map(p=>[p.name,p]));
+  players.forEach(p=>{
+    if (p.present){
+      const q = map[p.name];
+      p.pos = q.pos; p.pp = q.pp;
+    } else {
+      p.pos = 0; p.pp = 0;
+    }
+  });
+
+  // Orden final: presentes por PTS/SCR/ACE/PAL/nombre; ausentes al final
+  players.sort((a,b)=>
+    (b.present - a.present) ||
+    (b.pts - a.pts) || (b.scr - a.scr) || (b.ace - a.ace) || (b.pal - a.pal) ||
+    String(a.name).localeCompare(String(b.name),'es',{sensitivity:'base'})
+  );
+
+  return { label, players };
+}
+
+// Procesar jornada Posiciones (deben ser EXACTAMENTE 3 logs)
+function processJornada_POS(){
+  const files = document.getElementById('fileInputJornada').files;
+  if (!files || files.length !== 3){
+    return showError('Para Torneo Posiciones debes subir exactamente 3 archivos: 1º-2º-3º | 4º-5º-6º | 7º-8º-9º-10º');
+  }
+  processedData = []; let processed = 0;
+
+  // Ordenamos por nombre para intentar “1-2-3 / 4-5-6 / 7-8-9-10”
+  const arr = Array.from(files).sort((a,b)=> a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'}));
+  arr.forEach(async (file, idx)=>{
+    try{
+      const text = await file.text();
+      const group = parsePosLog(text, file.name);
+      processedData[idx] = group;
+      processed++;
+      if (processed === arr.length){
+        const res = document.getElementById('results');
+        res.innerHTML = `<div class="success">Posiciones: 3 archivos procesados. Pulsa "Descargar Excel".</div>`;
+        res.style.display='block';
+        document.getElementById('downloadSection').style.display='block';
+        document.getElementById('downloadBtn').disabled=false;
+        currentProcess='jornada';
+      }
+    }catch(err){
+      showError(`Error Posiciones en ${file.name}: ${err.message}`);
+    }
+  });
+}
+
+// Construcción de hoja Posiciones (diseño similar a tu captura)
+function buildPOSSheet(ws, groups){
+  const leftMarginCols = 1, betweenGroupsCols = 4, rightMarginCols = 1;
+  const marginW = widthFromPx(24);
+  const nameW   = widthFromPx(150);
+  const numW    = widthFromPx(40);
+  const bandARGB = 'FF0B7D7D';
+  const whiteARGB = 'FFFFFFFF';
+
+  ws.views = [{ state:'normal', showGridLines:false }];
+
+  // Margen superior
+  ws.spliceRows(1,0,[]); try{ ws.getRow(1).height = 7.5; }catch{}
+
+  // Vamos a colocar 2 grupos en la parte superior (izq y dcha) y el 3º debajo a la izquierda.
+  // Calculamos columnas suficientes para 2 grupos en hilera
+  const totalCols = leftMarginCols + (2*6) + betweenGroupsCols + rightMarginCols;
+  ws.columns = Array.from({length: totalCols}, ()=>({width: 11}));
+  ws.getColumn(1).width = marginW;
+  ws.getColumn(totalCols).width = marginW;
+
+  // Helper para pintar un bloque de grupo
+  const paintGroup = (baseCol, headerRow, g) => {
+    // Cabecera: [LABEL, PP, PTS, PO, SC, AC]
+    const headers = [ g.label || 'GRUPO', 'PP', 'PTS', 'PO', 'SC', 'AC' ];
+    for (let off=0; off<6; off++){
+      const c = ws.getCell(headerRow, baseCol+off);
+      c.value = headers[off];
+      c.font = { bold:true, color:{argb:whiteARGB} };
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bandARGB} };
+      c.alignment = { horizontal: off===0 ? 'left':'center', vertical:'middle' };
+      c.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
+    }
+    ws.getColumn(baseCol).width = nameW;
+    for (let off=1; off<=5; off++) ws.getColumn(baseCol+off).width = numW;
+
+    // Filas
+    let r = headerRow + 1;
+    const putStat = (col, val, present, alwaysShow=false) => {
+      const cell = ws.getCell(r, col);
+      if (!present) cell.value = null;
+      else {
+        const n = Number(val||0);
+        cell.value = (alwaysShow ? n : (n===0 ? null : n));
+      }
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+    };
+
+    (g.players || []).forEach(p=>{
+      const cN = ws.getCell(r, baseCol);
+      cN.value = p.name || '';
+      cN.alignment = { horizontal:'left', vertical:'middle' };
+
+      const cPP = ws.getCell(r, baseCol+1);
+      cPP.value = (p.pp ?? 0); cPP.font = { bold:true };
+      cPP.alignment = { horizontal:'center', vertical:'middle' };
+
+      putStat(baseCol+2, p.pts, true, true);     // PTS: mostrar 0
+      putStat(baseCol+3, p.pal, p.present, false); // PO: ocultar 0 si ausente/0
+      putStat(baseCol+4, p.scr, p.present, false); // SC
+      putStat(baseCol+5, p.ace, p.present, false); // AC
+
+      r++;
+    });
+  };
+
+  // Colocar grupos:
+  // Sup.: g0 izquierda, g1 derecha
+  const g0 = groups[0], g1 = groups[1], g2 = groups[2];
+
+  const headerTop = 2;
+  let baseCol = leftMarginCols + 1;
+  paintGroup(baseCol, headerTop, g0);
+  // separador central
+  for (let s=0; s<betweenGroupsCols; s++) ws.getColumn(baseCol + 6 + s).width = marginW;
+  // segundo grupo arriba a la derecha
+  paintGroup(baseCol + 6 + betweenGroupsCols, headerTop, g1);
+
+  // Tercer grupo debajo a la izquierda
+  const rowsTop = Math.max((g0.players||[]).length, (g1.players||[]).length) + 3; // cabecera+filas+1
+  paintGroup(baseCol, headerTop + rowsTop, g2);
+
+  // Ajuste impresión
+  try {
+    ws.pageSetup = { orientation:'landscape', fitToPage:true,
+      margins:{ left:0.3, right:0.3, top:0.4, bottom:0.4, header:0.2, footer:0.2 } };
+  }catch{}
+}
+
+// Descargar Excel Posiciones
+async function downloadExcel_POS(){
+  if (!processedData || processedData.length !== 3)
+    return showError('No hay datos de Torneo Posiciones procesados.');
+
+  const wb = new ExcelJS.Workbook();
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Posiciones', { views:[{ state:'normal', showGridLines:false }] });
+  buildPOSSheet(ws, processedData);
+
+  const uint8 = await wb.xlsx.writeBuffer();
+  const stamp = new Date().toISOString().slice(0,10);
+  saveAs(new Blob([uint8], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `Posiciones_${stamp}.xlsx`);
+  showSuccess('Excel Torneo Posiciones generado correctamente.');
+}
+
+/* ==================== FIN BLOQUE POSICIONES ===================== */
 
 /* ==================== FIN BLOQUE RELEVOS ===================== */
 

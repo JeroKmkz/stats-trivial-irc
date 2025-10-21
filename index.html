@@ -462,6 +462,17 @@ function buildPlayoffSheet(ws, po){
   // Campeón (columna 11)
   box(8, 11, po.champ || '');
 
+  // --- Línea blanca separadora entre semifinalistas (solo debajo del superior) ---
+  const whiteLine = { style: 'thin', color: { argb: 'FFFFFFFF' } };
+
+  // Semifinal 1: línea blanca bajo el primer semifinalista
+  const sf1_top = ws.getCell(5, 3);
+  sf1_top.border = { ...sf1_top.border, bottom: whiteLine };
+
+  // Semifinal 2: línea blanca bajo el primer semifinalista
+  const sf2_top = ws.getCell(11, 3);
+  sf2_top.border = { ...sf2_top.border, bottom: whiteLine };
+
   // Anchos base ~36 px para todas
   const px = v => +(v/7).toFixed(2);
   for (let col = 1; col <= 20; col++) ws.getColumn(col).width = px(36);
@@ -3922,7 +3933,7 @@ function buildPOSSheet(ws, groups){
       c.value = headers[off];
       c.font = { bold:true, color:{argb:whiteARGB} };
       c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bandARGB} };
-      c.alignment = { horizontal: off===0 ? 'left':'center', vertical:'middle' };
+      c.alignment = { horizontal:'center', vertical:'middle' };
       c.border = { top:{style:'thin'}, left:{style:'thin'}, bottom:{style:'thin'}, right:{style:'thin'} };
     }
     ws.getColumn(baseCol).width = nameW;
@@ -3943,19 +3954,12 @@ function buildPOSSheet(ws, groups){
     (g.players || []).forEach(p=>{
       const cN = ws.getCell(r, baseCol);
       cN.value = p.name || '';
-      cN.alignment = { horizontal:'left', vertical:'middle' };
+      cN.alignment = { horizontal:'center', vertical:'middle' };
 
       const cPP = ws.getCell(r, baseCol+1);
       cPP.value = (p.pp ?? 0); cPP.font = { bold:true };
       cPP.alignment = { horizontal:'center', vertical:'middle' };
-      // Borde alrededor de toda la celda de PP
-      cPP.border = {
-        top:    { style:'thin' },
-        bottom: { style:'thin' },
-        left:   { style:'thin' },
-        right:  { style:'thin' }
-      };
-
+      
       putStat(baseCol+2, p.pts, p.present, true); // PTS: si ausente ⇒ vacío; si presente ⇒ muestra incluso 0
       putStat(baseCol+3, p.pal, p.present, false); // PO: ocultar 0 si ausente/0
       putStat(baseCol+4, p.scr, p.present, false); // SC
@@ -3963,6 +3967,23 @@ function buildPOSSheet(ws, groups){
 
       r++;
     });
+
+      // === Borde “rectángulo único” para la columna PP ===
+      const firstRow = headerRow + 1;                           // primera fila de datos del grupo
+      const lastRow  = headerRow + (g.players?.length || 0);    // última fila de datos del grupo
+      const ppCol    = baseCol + 1;                             // columna PP
+    
+      if (lastRow >= firstRow) {
+        for (let rr = firstRow; rr <= lastRow; rr++) {
+          const cell = ws.getCell(rr, ppCol);
+          cell.border = {
+            left:   { style: 'thin' },
+            right:  { style: 'thin' },
+            top:    rr === firstRow ? { style: 'thin' } : undefined,
+            bottom: rr === lastRow  ? { style: 'thin' } : undefined
+          };
+        }
+      }
   };
 
   // Colocar grupos:

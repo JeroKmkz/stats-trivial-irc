@@ -1838,7 +1838,7 @@ function buildGPFinalSheet(ws, finalResults) {
     totCell.font = { bold: true, color: { argb: blackARGB } };
     totCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) totCell.fill = rowFill;
-    totCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
+    totCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
     
     // DES (en rojo y negrita)
     const desCell = ws.getCell(row, 3);
@@ -1846,7 +1846,7 @@ function buildGPFinalSheet(ws, finalResults) {
     desCell.font = { bold: true, color: { argb: redARGB } };
     desCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) desCell.fill = rowFill;
-    desCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
+    desCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
     
     // PO (Palos totales) - negrita
     const poCell = ws.getCell(row, 4);
@@ -1854,7 +1854,7 @@ function buildGPFinalSheet(ws, finalResults) {
     poCell.font = { bold: true };
     poCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) poCell.fill = rowFill;
-    poCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
+    poCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
     
     // SC (Scratches totales) - negrita
     const scCell = ws.getCell(row, 5);
@@ -1862,7 +1862,7 @@ function buildGPFinalSheet(ws, finalResults) {
     scCell.font = { bold: true };
     scCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) scCell.fill = rowFill;
-    scCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
+    scCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
     
     // AC (Aces totales) - negrita
     const acCell = ws.getCell(row, 6);

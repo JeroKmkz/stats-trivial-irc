@@ -1702,7 +1702,7 @@ function buildGPFinalSheet(ws, finalResults) {
   const bronzeARGB = 'FFCD7F32';  // Bronce
   
   // Colores alternados para filas
-  const lightGrayARGB = 'FFE0E0E0'; // Gris claro para filas alternas
+  const lightGrayARGB = 'FFDEE3E9'; // Gris azulado para filas alternas
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
@@ -1803,8 +1803,13 @@ function buildGPFinalSheet(ws, finalResults) {
       rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: silverARGB } };
     } else if (index === 2) {
       rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bronzeARGB } };
-    } else if (index % 2 === 1) {
-      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } };
+    } else {
+      // Empezar alternancia en index 4:
+      // index 3 => blanco; index 4 => gris; 5 => blanco; 6 => gris; ...
+      const altStart = 4; // primera fila alterna tras podio (0-based)
+      if (index >= altStart && ((index - altStart) % 2 === 0)) {
+        rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } };
+      }
     }
 
     // NICK

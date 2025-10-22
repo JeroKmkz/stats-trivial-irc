@@ -393,8 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
   onCompetitionChange();
 });
 
-}); // Cierre del DOMContentLoaded
-
 function initPlayoffUI(){
   // Rellenar selects desde COLORES_EQUIPOS
   const teams = Object.keys(COLORES_EQUIPOS || {}).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
@@ -1901,37 +1899,33 @@ function buildGPFinalSheet(ws, finalResults) {
     
   // Quitar borde inferior de TODAS las filas de datos menos la última
   {
-    const firstDataRow = 3;
+    const firstDataRow = 3;                           // datos empiezan en fila 3
     const lastDataRow  = finalResults.players.length + 2;
-    const totalCols    = 6 + (finalResults.themes.length * 4);
   
-    // 1) Filas 3..penúltima -> quitar bottom pero PRESERVAR bordes especiales
+    // 6 columnas base (NICK..AC) + 4 por temática
+    const totalCols = 6 + (finalResults.themes.length * 4);
+  
+    // Quita bottom en filas 3..(lastDataRow-1), preservando top/left/right existentes
     for (let r = firstDataRow; r < lastDataRow; r++) {
       for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(r, c);
         const b = cell.border || {};
-        
-        // Preservar el borde existente pero quitar bottom
         cell.border = {
-          top:    b.top    || { style: 'thin' },
-          left:   b.left   || { style: 'thin' },
-          right:  b.right  || { style: 'thin' },  // MANTIENE thick si ya lo tenía
-          bottom: undefined
+          top:   b.top,
+          left:  b.left,
+          right: b.right
+          // sin bottom
         };
       }
     }
-  
-    // 2) Última fila -> bottom GRUESO, preservando bordes especiales
-    for (let c = 1; c <= totalCols; c++) {
-      const cell = ws.getCell(lastDataRow, c);
-      const b = cell.border || {};
-      cell.border = {
-        top:    b.top    || { style: 'thin' },
-        left:   b.left   || { style: 'thin' },
-        right:  b.right  || { style: 'thin' },  // MANTIENE thick si ya lo tenía
-        bottom: { style: 'thick' }
-      };
-    }
+  }
+
+  // Añadir bordes inferiores gruesos a la última fila
+  const lastRow = finalResults.players.length + 2;
+  for (let col = 1; col <= subHeaders.length; col++) {
+    const cell = ws.getCell(lastRow, col);
+    if (!cell.border) cell.border = {};
+    cell.border.bottom = { style: 'thick' };
   }
   
 // PROCESO 2 GP: Totales GP

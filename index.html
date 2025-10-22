@@ -1702,7 +1702,7 @@ function buildGPFinalSheet(ws, finalResults) {
   const bronzeARGB = 'FFCD7F32';  // Bronce
   
   // Colores alternados para filas
-  const lightGrayARGB = 'FFF5F5F5'; // Gris claro para filas alternas
+  const lightGrayARGB = 'FFE0E0E0'; // Gris claro para filas alternas
   
   ws.views = [{ state: 'normal', showGridLines: false }];
   
@@ -1889,32 +1889,31 @@ function buildGPFinalSheet(ws, finalResults) {
     }
   });
 
-  // 🔻 Pintar en BLANCO las líneas horizontales (top/bottom) de TODAS las filas de datos excepto la última
+  // 🔻 Pintar en BLANCO las líneas horizontales (top/bottom) de TODAS las filas de datos,
+  //     incluyendo la última; luego repondremos el borde inferior grueso solo en la última.
   {
     const firstDataRow = 3; // datos empiezan en fila 3
     const lastDataRow  = finalResults.players.length + 2;
     const totalCols    = 6 + (finalResults.themes.length * 4);
     const whiteLine    = { style: 'thin', color: { argb: 'FFFFFFFF' } };
   
-    for (let r = firstDataRow; r < lastDataRow; r++) { // ojo: < lastDataRow
+    for (let r = firstDataRow; r <= lastDataRow; r++) { // <= para incluir la última
       for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(r, c);
         const b = cell.border || {};
         cell.border = {
-          // dejamos los verticales tal y como estuvieran
           left:  b.left,
           right: b.right,
-          // y forzamos horizontales en blanco
           top:    whiteLine,
           bottom: whiteLine
         };
       }
     }
   }
-
-  // Añadir borde inferior grueso a la última fila de datos
+  
+  // ✅ Reponer solo el borde inferior GRUESO en la última fila de datos (cierra la tabla)
   {
-    const lastRow = finalResults.players.length + 2;
+    const lastRow   = finalResults.players.length + 2;
     const totalCols = 6 + (finalResults.themes.length * 4);
     for (let col = 1; col <= totalCols; col++) {
       const cell = ws.getCell(lastRow, col);
@@ -1922,6 +1921,7 @@ function buildGPFinalSheet(ws, finalResults) {
       cell.border = { ...b, bottom: { style: 'thick' } };
     }
   }
+
 } // ← CIERRE de buildGPFinalSheet
   
 // PROCESO 2 GP: Totales GP

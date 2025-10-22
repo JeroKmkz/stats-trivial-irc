@@ -1761,25 +1761,7 @@ function buildGPFinalSheet(ws, finalResults) {
       left:   { style: 'thin' },         // fino (aquí está el cambio clave)
       right:  { style: 'thin' }          // fino (aquí está el cambio clave)
     };
-  }
-
-  // 🔹 Uniformar bordes de datos en columnas NICK..AC (filas de jugadores)
-  // Sin borde inferior salvo la última fila (borde grueso)
-  const firstDataRow = 3; // Los datos empiezan en la fila 3
-  const lastDataRow = finalResults.players.length + 2;
-  
-  for (let r = firstDataRow; r <= lastDataRow; r++) {
-    const isLastRow = (r === lastDataRow);
-    for (let c = 1; c <= 6; c++) {
-      const cell = ws.getCell(r, c);
-      cell.border = {
-        top:    { style: 'thin' },
-        bottom: isLastRow ? { style: 'thick' } : undefined, // ❌ sin borde inferior excepto última
-        left:   { style: 'thin' },
-        right:  { style: 'thin' }
-      };
-    }
-  }
+  }  
   
   // Borde derecho de la última columna de cabecera
   const lastHeaderCell = ws.getCell(1, mainHeaders.length);
@@ -1914,6 +1896,27 @@ function buildGPFinalSheet(ws, finalResults) {
       acGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: rightBorder };
     }
   });
+
+  // 🔻 Quitar borde inferior en TODAS las filas de datos excepto la última
+  const firstDataRow = 3; // datos empiezan en fila 3
+  const lastDataRow  = finalResults.players.length + 2;
+  
+  // Total de columnas: 6 base (NICK..AC) + 4 por temática
+  const totalCols = 6 + (finalResults.themes.length * 4);
+  
+  for (let r = firstDataRow; r < lastDataRow; r++) { // ojo: < lastDataRow
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = ws.getCell(r, c);
+      const b = cell.border || {};
+      // Reaplicamos los bordes existentes pero SIN bottom
+      cell.border = {
+        top:  b.top,
+        left: b.left,
+        right: b.right
+        // bottom intencionadamente omitido = sin borde inferior
+      };
+    }
+  }
   
   // Añadir bordes inferiores gruesos a la última fila
   const lastRow = finalResults.players.length + 2;

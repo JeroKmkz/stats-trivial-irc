@@ -1791,121 +1791,110 @@ function buildGPFinalSheet(ws, finalResults) {
     cell.border = borderStyle;
   }
   
-  // Datos de jugadores
+    // Datos de jugadores
   finalResults.players.forEach((player, index) => {
     const row = index + 3;
-    
-    // Determinar color de fondo para el podio y filas alternas
+
+    // Colores de fila (podio + alternas)
     let rowFill = null;
     if (index === 0) {
-      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: goldARGB } }; // Oro
+      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: goldARGB } };
     } else if (index === 1) {
-      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: silverARGB } }; // Plata
+      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: silverARGB } };
     } else if (index === 2) {
-      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bronzeARGB } }; // Bronce
+      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bronzeARGB } };
     } else if (index % 2 === 1) {
-      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } }; // Filas alternas
+      rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGrayARGB } };
     }
-    
+
     // NICK
     const nickCell = ws.getCell(row, 1);
     nickCell.value = player.name;
     nickCell.font = { bold: true };
     nickCell.alignment = { horizontal: 'left', vertical: 'middle' };
     if (rowFill) nickCell.fill = rowFill;
-    nickCell.border = { top: {style: 'thin'}, left: {style: 'thick'}, right: {style: 'thin'} };
-    
-    // TOT (negro y negrita)
+    nickCell.border = { top: {style: 'thin'}, left: {style: 'thick'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
+    // TOT
     const totCell = ws.getCell(row, 2);
     totCell.value = player.totalPoints;
     totCell.font = { bold: true, color: { argb: blackARGB } };
     totCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) totCell.fill = rowFill;
-    totCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-    
-    // DES (en rojo y negrita)
+    totCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
+    // DES (izquierda fina)
     const desCell = ws.getCell(row, 3);
     desCell.value = player.minPoints;
     desCell.font = { bold: true, color: { argb: redARGB } };
     desCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) desCell.fill = rowFill;
-    desCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-    
-    // PO (Palos totales) - negrita
+    desCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
+    // PO (izquierda fina)
     const poCell = ws.getCell(row, 4);
     poCell.value = player.totalPalos;
     poCell.font = { bold: true };
     poCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) poCell.fill = rowFill;
-    poCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-    
-    // SC (Scratches totales) - negrita
+    poCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
+    // SC (izquierda fina)
     const scCell = ws.getCell(row, 5);
     scCell.value = player.totalScratches;
     scCell.font = { bold: true };
     scCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) scCell.fill = rowFill;
-    scCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-    
-    // AC (Aces totales) - negrita
+    scCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
+    // AC (derecha gruesa para cerrar bloque base)
     const acCell = ws.getCell(row, 6);
     acCell.value = player.totalAces;
     acCell.font = { bold: true };
     acCell.alignment = { horizontal: 'center', vertical: 'middle' };
     if (rowFill) acCell.fill = rowFill;
-    acCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thick'} };
-    
-    // Datos por GP/Temática
+    acCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
+
+    // Temáticas (5)
     for (let gp = 1; gp <= 5; gp++) {
       const baseCol = 7 + ((gp - 1) * 4);
       const gpData = player.gpResults[`gp${gp}`];
-      
-      // Verificar si el jugador estuvo ausente en esta temática
+
       const wasAbsent = !gpData || (gpData.points === 0 && gpData.palos === 0 && gpData.scratches === 0 && gpData.aces === 0);
-      
-      // PTS (negrita para temáticas)
+
       const ptsCell = ws.getCell(row, baseCol);
       ptsCell.value = (gpData && !wasAbsent) ? gpData.points : '';
       ptsCell.font = { bold: true };
       ptsCell.alignment = { horizontal: 'center', vertical: 'middle' };
       if (rowFill) ptsCell.fill = rowFill;
-      ptsCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-      
-      // PO (no negrita para temáticas)
+      ptsCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
       const poGpCell = ws.getCell(row, baseCol + 1);
       poGpCell.value = (gpData && !wasAbsent && gpData.palos > 0) ? gpData.palos : '';
       poGpCell.alignment = { horizontal: 'center', vertical: 'middle' };
       if (rowFill) poGpCell.fill = rowFill;
-      poGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-      
-      // SC (no negrita para temáticas)
+      poGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
       const scGpCell = ws.getCell(row, baseCol + 2);
       scGpCell.value = (gpData && !wasAbsent && gpData.scratches > 0) ? gpData.scratches : '';
       scGpCell.alignment = { horizontal: 'center', vertical: 'middle' };
       if (rowFill) scGpCell.fill = rowFill;
-      scGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'} };
-      
-      // AC (no negrita para temáticas)
+      scGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+
       const acGpCell = ws.getCell(row, baseCol + 3);
       acGpCell.value = (gpData && !wasAbsent && gpData.aces > 0) ? gpData.aces : '';
       acGpCell.alignment = { horizontal: 'center', vertical: 'middle' };
       if (rowFill) acGpCell.fill = rowFill;
-      
-      // Borde derecho especial para separar temáticas
-      const rightBorder = (gp === 5) ? {style: 'thick'} : {style: 'thick'};
-      acGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: rightBorder };
+      acGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, bottom: {style: 'thin'}, right: {style: 'thick'} };
     }
   });
-    
-  // Quitar borde inferior de TODAS las filas de datos menos la última
+
+  // Quitar borde inferior en TODAS las filas de datos excepto la última
   {
-    const firstDataRow = 3;                           // datos empiezan en fila 3
+    const firstDataRow = 3;
     const lastDataRow  = finalResults.players.length + 2;
-  
-    // 6 columnas base (NICK..AC) + 4 por temática
-    const totalCols = 6 + (finalResults.themes.length * 4);
-  
-    // Quita bottom en filas 3..(lastDataRow-1), preservando top/left/right existentes
+    const totalCols    = 6 + (finalResults.themes.length * 4);
+
     for (let r = firstDataRow; r < lastDataRow; r++) {
       for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(r, c);
@@ -1920,13 +1909,17 @@ function buildGPFinalSheet(ws, finalResults) {
     }
   }
 
-  // Añadir bordes inferiores gruesos a la última fila
-  const lastRow = finalResults.players.length + 2;
-  for (let col = 1; col <= subHeaders.length; col++) {
-    const cell = ws.getCell(lastRow, col);
-    if (!cell.border) cell.border = {};
-    cell.border.bottom = { style: 'thick' };
+  // Añadir borde inferior grueso a la última fila de datos
+  {
+    const lastRow = finalResults.players.length + 2;
+    const totalCols = 6 + (finalResults.themes.length * 4);
+    for (let col = 1; col <= totalCols; col++) {
+      const cell = ws.getCell(lastRow, col);
+      const b = cell.border || {};
+      cell.border = { ...b, bottom: { style: 'thick' } };
+    }
   }
+} // ← CIERRE de buildGPFinalSheet
   
 // PROCESO 2 GP: Totales GP
 async function processTotales_GP(){

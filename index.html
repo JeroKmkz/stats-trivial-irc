@@ -1736,23 +1736,7 @@ function buildGPFinalSheet(ws, finalResults) {
       cell.font = { bold: true, color: { argb: whiteARGB } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      // Bordes finos para las primeras 6 columnas (NICK a AC)
-      if (col < 6) {
-        cell.border = { 
-          top: { style: 'thin' }, 
-          left: { style: 'thin' }, 
-          bottom: { style: 'thin' }, 
-          right: { style: 'thin' } 
-        };
-      } else {
-        // Para las cabeceras de temáticas, mantener el borde superior grueso
-        cell.border = { 
-          top: { style: 'thick' }, 
-          left: { style: 'thin' }, 
-          bottom: { style: 'thin' }, 
-          right: { style: 'thin' } 
-        };
-      }
+      cell.border = { top: {style: 'thick'}, left: {style: 'thick'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
       
       // Merge para las temáticas (4 columnas cada una)
       if (col >= 6 && (col - 6) % 4 === 0) {
@@ -1766,6 +1750,17 @@ function buildGPFinalSheet(ws, finalResults) {
     ws.mergeCells(1, i, 2, i);
     const cell = ws.getCell(1, i);
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  }
+
+  // 🔸 Normalizar bordes de NICK..AC: laterales finos, banda superior gruesa
+  for (let i = 1; i <= 6; i++) {
+    const c = ws.getCell(1, i);          // celda combinada (1:2)
+    c.border = {
+      top:    { style: 'thick' },        // banda superior gruesa como el resto del header
+      bottom: { style: 'thin' },         // fino
+      left:   { style: 'thin' },         // fino (aquí está el cambio clave)
+      right:  { style: 'thin' }          // fino (aquí está el cambio clave)
+    };
   }
   
   // Borde derecho de la última columna de cabecera

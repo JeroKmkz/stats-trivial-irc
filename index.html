@@ -1764,16 +1764,17 @@ function buildGPFinalSheet(ws, finalResults) {
   }
 
   // 🔹 Uniformar bordes de datos en columnas NICK..AC (filas de jugadores)
+  // Sin borde inferior salvo la última fila (borde grueso)
   const firstDataRow = 3; // Los datos empiezan en la fila 3
   const lastDataRow = finalResults.players.length + 2;
   
   for (let r = firstDataRow; r <= lastDataRow; r++) {
+    const isLastRow = (r === lastDataRow);
     for (let c = 1; c <= 6; c++) {
       const cell = ws.getCell(r, c);
-      // Mantener cualquier fondo, pero bordes finos
       cell.border = {
         top:    { style: 'thin' },
-        bottom: { style: 'thin' },
+        bottom: isLastRow ? { style: 'thick' } : undefined, // ❌ sin borde inferior excepto última
         left:   { style: 'thin' },
         right:  { style: 'thin' }
       };

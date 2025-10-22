@@ -1762,6 +1762,23 @@ function buildGPFinalSheet(ws, finalResults) {
       right:  { style: 'thin' }          // fino (aquí está el cambio clave)
     };
   }
+
+  // 🔹 Uniformar bordes de datos en columnas NICK..AC (filas de jugadores)
+  const firstDataRow = 3; // Los datos empiezan en la fila 3
+  const lastDataRow = finalResults.players.length + 2;
+  
+  for (let r = firstDataRow; r <= lastDataRow; r++) {
+    for (let c = 1; c <= 6; c++) {
+      const cell = ws.getCell(r, c);
+      // Mantener cualquier fondo, pero bordes finos
+      cell.border = {
+        top:    { style: 'thin' },
+        bottom: { style: 'thin' },
+        left:   { style: 'thin' },
+        right:  { style: 'thin' }
+      };
+    }
+  }
   
   // Borde derecho de la última columna de cabecera
   const lastHeaderCell = ws.getCell(1, mainHeaders.length);

@@ -1896,73 +1896,41 @@ function buildGPFinalSheet(ws, finalResults) {
       acGpCell.border = { top: {style: 'thin'}, left: {style: 'thin'}, right: rightBorder };
     }
   });
-
-  // 🔻 Quitar borde inferior en TODAS las filas de datos (fila 3 .. penúltima)
-  // y dejar solo borde inferior GRUESO en la última fila
-  {
-    const firstDataRow = 3;                                // datos empiezan en fila 3
-    const lastDataRow  = finalResults.players.length + 2;  // última fila con datos
-    const totalCols    = 6 + (finalResults.themes.length * 4); // 6 base + 4 por temática
-  
-    // 1) Para todas las filas de datos EXCEPTO la última: sin borde inferior
-    for (let r = firstDataRow; r < lastDataRow; r++) {
-      for (let c = 1; c <= totalCols; c++) {
-        const cell = ws.getCell(r, c);
-        // Reaplicamos explícitamente solo top/left/right finos, SIN bottom
-        cell.border = {
-          top:   { style: 'thin' },
-          left:  { style: 'thin' },
-          right: { style: 'thin' }
-          // (sin bottom)
-        };
-      }
-    }
-  
-    // 2) Última fila de datos: borde inferior GRUESO para cerrar la tabla
-    for (let c = 1; c <= totalCols; c++) {
-      const cell = ws.getCell(lastDataRow, c);
-      cell.border = {
-        top:   { style: 'thin' },
-        left:  { style: 'thin' },
-        right: { style: 'thin' },
-        bottom:{ style: 'thick' }
-      };
-    }
-  }
-  
+    
   // Quitar borde inferior de TODAS las filas de datos menos la última
   {
     const firstDataRow = 3;
     const lastDataRow  = finalResults.players.length + 2;
     const totalCols    = 6 + (finalResults.themes.length * 4);
   
-    // 1) Filas 3..penúltima -> bottom undefined
+    // 1) Filas 3..penúltima -> quitar bottom pero PRESERVAR bordes especiales
     for (let r = firstDataRow; r < lastDataRow; r++) {
       for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(r, c);
         const b = cell.border || {};
+        
+        // Preservar el borde existente pero quitar bottom
         cell.border = {
           top:    b.top    || { style: 'thin' },
           left:   b.left   || { style: 'thin' },
-          right:  b.right  || { style: 'thin' },
+          right:  b.right  || { style: 'thin' },  // MANTIENE thick si ya lo tenía
           bottom: undefined
         };
       }
     }
   
-    // 2) Última fila -> bottom GRUESO
+    // 2) Última fila -> bottom GRUESO, preservando bordes especiales
     for (let c = 1; c <= totalCols; c++) {
       const cell = ws.getCell(lastDataRow, c);
       const b = cell.border || {};
       cell.border = {
         top:    b.top    || { style: 'thin' },
         left:   b.left   || { style: 'thin' },
-        right:  b.right  || { style: 'thin' },
+        right:  b.right  || { style: 'thin' },  // MANTIENE thick si ya lo tenía
         bottom: { style: 'thick' }
       };
     }
   }
-}
   
 // PROCESO 2 GP: Totales GP
 async function processTotales_GP(){

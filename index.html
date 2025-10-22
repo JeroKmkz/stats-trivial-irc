@@ -1889,21 +1889,24 @@ function buildGPFinalSheet(ws, finalResults) {
     }
   });
 
-  // Quitar borde inferior en TODAS las filas de datos excepto la última
+  // 🔻 Pintar en BLANCO las líneas horizontales (top/bottom) de TODAS las filas de datos excepto la última
   {
-    const firstDataRow = 3;
+    const firstDataRow = 3; // datos empiezan en fila 3
     const lastDataRow  = finalResults.players.length + 2;
     const totalCols    = 6 + (finalResults.themes.length * 4);
-
-    for (let r = firstDataRow; r < lastDataRow; r++) {
+    const whiteLine    = { style: 'thin', color: { argb: 'FFFFFFFF' } };
+  
+    for (let r = firstDataRow; r < lastDataRow; r++) { // ojo: < lastDataRow
       for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(r, c);
         const b = cell.border || {};
         cell.border = {
-          top:   b.top,
+          // dejamos los verticales tal y como estuvieran
           left:  b.left,
-          right: b.right
-          // sin bottom
+          right: b.right,
+          // y forzamos horizontales en blanco
+          top:    whiteLine,
+          bottom: whiteLine
         };
       }
     }

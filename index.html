@@ -393,6 +393,8 @@ document.addEventListener('DOMContentLoaded', () => {
   onCompetitionChange();
 });
 
+}); // Cierre del DOMContentLoaded
+
 function initPlayoffUI(){
   // Rellenar selects desde COLORES_EQUIPOS
   const teams = Object.keys(COLORES_EQUIPOS || {}).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));

@@ -1736,7 +1736,23 @@ function buildGPFinalSheet(ws, finalResults) {
       cell.font = { bold: true, color: { argb: whiteARGB } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgARGB } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { top: {style: 'thick'}, left: {style: 'thick'}, bottom: {style: 'thin'}, right: {style: 'thin'} };
+      // Bordes finos para las primeras 6 columnas (NICK a AC)
+      if (col < 6) {
+        cell.border = { 
+          top: { style: 'thin' }, 
+          left: { style: 'thin' }, 
+          bottom: { style: 'thin' }, 
+          right: { style: 'thin' } 
+        };
+      } else {
+        // Para las cabeceras de temáticas, mantener el borde superior grueso
+        cell.border = { 
+          top: { style: 'thick' }, 
+          left: { style: 'thin' }, 
+          bottom: { style: 'thin' }, 
+          right: { style: 'thin' } 
+        };
+      }
       
       // Merge para las temáticas (4 columnas cada una)
       if (col >= 6 && (col - 6) % 4 === 0) {

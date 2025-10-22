@@ -1744,6 +1744,13 @@ function buildGPFinalSheet(ws, finalResults) {
       }
     }
   }
+
+  // 🔹 Combinar las 6 primeras cabeceras (NICK, TOT, DES, PO, SC, AC) con la fila 2
+  for (let i = 1; i <= 6; i++) {
+    ws.mergeCells(1, i, 2, i);
+    const cell = ws.getCell(1, i);
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  }
   
   // Borde derecho de la última columna de cabecera
   const lastHeaderCell = ws.getCell(1, mainHeaders.length);

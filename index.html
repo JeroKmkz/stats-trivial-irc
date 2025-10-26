@@ -270,7 +270,7 @@
     <!-- PROCESO 1: Estadísticas de la Jornada -->
     <div class="upload-section">
       <h3>📊 Estadísticas de la Jornada</h3>
-      <p>Sube los logs (.txt) de las partidas de una jornada específica</p>
+      <p>Sube los archivos de puntos (.txt) de la/s partida/s de una jornada específica</p>
       <input type="file" id="fileInputJornada" accept=".txt" multiple />
       <br />
       <button class="button" id="processJornadaBtn" disabled>Procesar Jornada</button>
@@ -523,12 +523,12 @@ function onCompetitionChange(){
     desc.textContent = 'Sube los Excels (.xlsx) de GP generados de cada jornada para obtener totales acumulados';
     btn.textContent = 'Generar Totales GP';
   } else if (competitionType === 'copa') {
-    title.textContent = '🏆 Final de Copa';
-    desc.textContent = 'Sube el Excel (.xlsx) de la Copa para generar estadísticas finales';
+    title.textContent = '🏆 Final de Copa (no funcional)';
+    desc.textContent = 'Esta opción está desactivada actualmente. No genera resultados ni estadísticas.';
     btn.textContent = 'Generar Final Copa';
   } else if (competitionType === 'master') {
-    title.textContent = '🏆 Máster por Equipos';
-    desc.textContent = 'Sube el log (.txt) del Máster por Equipos para generar estadísticas';
+    title.textContent = '🏆 Máster por Equipos (no funcional en esta sección)';
+    desc.textContent = 'La generación de totales del Máster no está activa. Usa la parte superior para procesar el archivo de puntos (.txt) si está disponible.';
     btn.textContent = 'Generar Máster';
   } else if (competitionType === 'posiciones') {
     title.textContent = '🏆 Torneo Posiciones (sin totales)';

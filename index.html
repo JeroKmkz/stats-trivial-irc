@@ -1330,6 +1330,39 @@ for (let i=0, pos=1; i<present.length; ){
   return { group: groupName, players };
 }
 
+// === Helpers GP Final: detección de tema por nombre de archivo ===
+function stripAccents(s){
+  try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); } catch { return s; }
+}
+
+/**
+ * Intenta deducir el índice del tema (0..4) a partir del nombre de archivo y la lista de temas seleccionados.
+ * - Coincidencia por texto del tema (insensible a acentos y espacios)
+ * - Patrones genéricos: "Tema 1", "Tema1", "T1", "GP1", etc.
+ * Devuelve -1 si no puede deducirlo.
+ */
+function detectThemeIndexFromName(fileName, themes){
+  const base = stripAccents(String(fileName||'').toLowerCase());
+  
+  // 1) Patrones genéricos: "tema 1", "tema1", "t1", "gp1"
+  const generic = base.match(/\b(?:tema|t|gp)\s*([1-5])\b/);
+  if (generic){
+    const n = parseInt(generic[1],10);
+    if (n>=1 && n<=5) return n-1;
+  }
+
+  // 2) Coincidencia por texto de la temática elegida por el usuario
+  const squish = (s)=> stripAccents(String(s||'').toLowerCase()).replace(/\s+/g,'');
+  const baseNoSpace = base.replace(/\s+/g,'');
+  for (let i=0;i<themes.length;i++){
+    const th = squish(themes[i]);
+    if (!th) continue;
+    if (baseNoSpace.includes(th)) return i;
+  }
+
+  return -1;
+}
+
 function processJornada_GP(){
   const files = document.getElementById('fileInputJornada').files;
   if (!files || files.length === 0) return showError('Selecciona al menos un archivo de log (GP)');
@@ -1389,30 +1422,105 @@ function processJornada_GP_Normal(files, theme) {
 }
 
 function processJornada_GP_Final(files, themes) {
+  // Validación previa (se mantiene igual)
   processedData = { isFinal: true, themes: themes, logs: [] };
   let processed = 0;
-  
-  Array.from(files).forEach(async (file, index) => {
+
+  // 1) Construimos lista de archivos con su índice original
+  const entries = Array.from(files).map((file, idx) => ({ file, idx }));
+
+  // 2) Intento de mapeo automático archivo→tema
+  //    - fileToTheme[fileIdx] = themeIdx (0..4)
+  const fileToTheme = new Array(entries.length).fill(null);
+  const themeUsed = new Array(themes.length).fill(false);
+
+  // Paso A: detección por nombre de archivo / patrón genérico / coincidencia por texto del tema
+  entries.forEach(({file, idx}) => {
+    const guess = detectThemeIndexFromName(file.name, themes);
+    if (guess >= 0 && !themeUsed[guess]) {
+      fileToTheme[idx] = guess;
+      themeUsed[guess] = true;
+    }
+  });
+
+  // Paso B: para los que no se han podido deducir, preguntar (como en Relevos)
+  entries.forEach(({file, idx}) => {
+    if (fileToTheme[idx] != null) return; // ya asignado
+
+    // Construimos lista de opciones disponibles (no usadas)
+    const avail = themes
+      .map((t,i)=> ({ label:`${i+1}: ${t}`, value:i }))
+      .filter(o => !themeUsed[o.value]);
+
+    // Si no hay disponibles, salimos (caerá en el fallback C)
+    if (!avail.length) return;
+
+    // Prompt simple (evita UI compleja); usuario teclea 1..5
+    const msg =
+      `No pude deducir la temática para:\n\n` +
+      `  ${file.name}\n\n` +
+      `Indica el número de temática (1..5) según tu selección:\n` +
+      avail.map(o=>`  ${o.label}`).join('\n') +
+      `\n\n(Deja en blanco para asignar por orden restante)`;
+
+    const choice = (typeof window !== 'undefined') ? window.prompt(msg, '') : null;
+    const n = parseInt(choice||'', 10);
+
+    if (Number.isInteger(n) && n>=1 && n<=themes.length) {
+      const themeIdx = n-1;
+      if (!themeUsed[themeIdx]) {
+        fileToTheme[idx] = themeIdx;
+        themeUsed[themeIdx] = true;
+      }
+    }
+  });
+
+  // Paso C: fallback final: asignar por orden los temas aún libres a los archivos no asignados
+  const remainingThemes = [];
+  for (let i=0;i<themes.length;i++) if (!themeUsed[i]) remainingThemes.push(i);
+
+  entries.forEach(({idx}) => {
+    if (fileToTheme[idx] == null) {
+      fileToTheme[idx] = remainingThemes.shift(); // puede quedar undefined si algo raro, pero en teoría 5 archivos/5 temas
+    }
+  });
+
+  // Informe de asignaciones (opcional)
+  const mappingLines = entries.map(({file, idx})=>{
+    const ti = fileToTheme[idx];
+    const tName = (ti!=null && ti>=0) ? themes[ti] : '(sin asignar)';
+    return `• ${file.name} → ${tName}`;
+  }).join('<br/>');
+
+  // 3) Leer/parsear archivos con el tema asignado
+  let anyError = false;
+
+  entries.forEach(async ({file, idx}) => {
     try {
       const text = await file.text();
-      const logData = parseGPFinalLog(text, themes[index], index + 1);
-      processedData.logs[index] = logData;
+      const themeIdx = fileToTheme[idx];
+      const themeName = (themeIdx!=null && themeIdx>=0) ? themes[themeIdx] : '(?)';
+      const logData = parseGPFinalLog(text, themeName, (themeIdx!=null ? (themeIdx+1) : (idx+1)));
+      processedData.logs[idx] = logData;
       processed++;
-      
-      if (processed === files.length) {
-        // Procesar datos de la final
+
+      if (processed === entries.length) {
+        // Ensamblar resultados finales
         const finalResults = processFinalResults(processedData.logs, themes);
         processedData.finalResults = finalResults;
-        
+
         const res = document.getElementById('results');
-        res.innerHTML = `<div class="success">FINAL GP: 5 archivos procesados. Pulsa "Descargar Excel".</div>`;
+        res.innerHTML =
+          `<div class="success">FINAL GP: 5 archivos procesados. Pulsa "Descargar Excel".</div>` +
+          `<div class="log-info" style="margin-top:10px"><strong>Asignación archivos ⇄ temáticas</strong><br/>${mappingLines}</div>`;
         res.style.display = 'block';
         document.getElementById('downloadSection').style.display='block';
         document.getElementById('downloadBtn').disabled = false;
         currentProcess='jornada';
       }
-    } catch(err) { 
-      showError(`Error procesando ${file.name}: ${err.message}`); 
+    } catch(err) {
+      anyError = true;
+      showError(`Error procesando ${file.name}: ${err.message}`);
     }
   });
 }

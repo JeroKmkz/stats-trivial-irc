@@ -307,6 +307,12 @@ function showSuccess(msg){ const res=document.getElementById('results'); res.inn
 const PX_PER_CHAR = 7;
 const widthFromPx = (px) => +(px / PX_PER_CHAR).toFixed(2);
 
+function getTorneoNumberFromName(filename){
+  // admite "#torneo01", "#TORNEO 1", "#torneo001", etc.
+  const m = String(filename || '').match(/#\s*torneo\s*0*([0-9]+)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 /* ===== INIT UI ===== */
 document.addEventListener('DOMContentLoaded', () => {
   const selComp = document.getElementById('competitionSelect');
@@ -761,9 +767,26 @@ function processJornada_LIGA(){
       try{
         const content = e.target.result;
         const data = parseLogFileSymbols(content);
-        processedData[index] = data;
+        
+        // anota nombre, posición original y número de torneo si lo hay
+        processedData[index] = {
+          ...data,
+          __fileName: file.name,
+          __orig: index,
+          __torneo: getTorneoNumberFromName(file.name)
+        };
         processed++;
         if (processed === files.length){
+
+          // ➊ Orden por #torneoNN si existe; si no, por el orden de subida original
+          processedData.sort((a,b)=>{
+            const A = a?.__torneo, B = b?.__torneo;
+            if (A != null && B != null) return A - B;     // ambos con número → orden numérico
+            if (A != null) return -1;                     // solo A tiene número → A primero
+            if (B != null) return  1;                     // solo B tiene número → B primero
+            return (a.__orig||0) - (b.__orig||0);         // ninguno tiene número → orden original
+          });
+        
           displayResults(processedData);
           document.getElementById('downloadSection').style.display='block';
           document.getElementById('downloadBtn').disabled = false;

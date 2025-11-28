@@ -512,81 +512,77 @@ async function generatePlayoffExcel(){
 function onCompetitionChange(){
   competitionType = document.getElementById('competitionSelect').value;
   const gpBox = document.getElementById('gpRoundBox');
-  gpBox.style.display = (competitionType==='gp') ? 'inline-block' : 'none';
+  if (gpBox) gpBox.style.display = (competitionType === 'gp') ? 'inline-block' : 'none';
 
-  const finalThemesBox = document.getElementById('gpFinalThemesBox');
-  const singleThemeSelect = document.getElementById('gpThemeSelect');
-  const gpRoundSelect = document.getElementById('gpRoundSelect');
-
-  if (competitionType !== 'gp') {
-    // Ocultamos por si estaba en FINAL
-    if (finalThemesBox) finalThemesBox.style.display = 'none';
-    // Devolvemos el selector simple a su estado normal
-    if (singleThemeSelect) singleThemeSelect.style.display = 'inline-block';
-    // Opcional: reseteamos la jornada GP a GP1
-    if (gpRoundSelect) gpRoundSelect.value = '1';
-  }  
-
-    // Mostrar Playoff solo si se elige "playoff"
-    const playoffPanel = document.getElementById('playoffPanel');
-    const isPlayoff = (competitionType === 'playoff');
-    if (playoffPanel) playoffPanel.style.display = isPlayoff ? '' : 'none';
+  // Mostrar Playoff solo si se elige "playoff"
+  const playoffPanel = document.getElementById('playoffPanel');
+  const isPlayoff = (competitionType === 'playoff');
+  if (playoffPanel) playoffPanel.style.display = isPlayoff ? '' : 'none';
 
   // Cambiar textos según el tipo de competición
   const title = document.getElementById('totalesTitle');
-  const desc = document.getElementById('totalesDescription');
-  const btn = document.getElementById('processTotalesBtn');
+  const desc  = document.getElementById('totalesDescription');
+  const btn   = document.getElementById('processTotalesBtn');
   
   if (competitionType === 'gp') {
-    title.textContent = '🏆 Totales GP';
-    desc.textContent = 'Sube los Excels (.xlsx) de GP generados de cada jornada para obtener totales acumulados';
-    btn.textContent = 'Generar Totales GP';
+    if (title) title.textContent = '🏆 Totales GP';
+    if (desc)  desc.textContent  = 'Sube los Excels (.xlsx) de GP generados de cada jornada para obtener totales acumulados';
+    if (btn)   btn.textContent   = 'Generar Totales GP';
   } else if (competitionType === 'copa') {
-    title.textContent = '🏆 Final de Copa (no funcional)';
-    desc.textContent = 'Esta opción está desactivada actualmente. No genera resultados ni estadísticas.';
-    btn.textContent = 'Generar Final Copa';
+    if (title) title.textContent = '🏆 Final de Copa (no funcional)';
+    if (desc)  desc.textContent  = 'Esta opción está desactivada actualmente. No genera resultados ni estadísticas.';
+    if (btn)   btn.textContent   = 'Generar Final Copa';
   } else if (competitionType === 'master') {
-    title.textContent = '🏆 Máster por Equipos (no funcional en esta sección)';
-    desc.textContent = 'La generación de totales del Máster no está activa. Usa la parte superior para procesar el archivo de puntos (.txt) si está disponible.';
-    btn.textContent = 'Generar Máster';
+    if (title) title.textContent = '🏆 Máster por Equipos (no funcional en esta sección)';
+    if (desc)  desc.textContent  = 'La generación de totales del Máster no está activa. Usa la parte superior para procesar el archivo de puntos (.txt) si está disponible.';
+    if (btn)   btn.textContent   = 'Generar Máster';
   } else if (competitionType === 'posiciones') {
-    title.textContent = '🏆 Torneo Posiciones (sin totales)';
-    desc.textContent  = 'Sube los 3 logs (1º-2º-3º | 4º-5º-6º | 7º-8º-9º-10º) y pulsa Procesar Jornada';
-    btn.textContent   = 'Totales desactivado';
+    if (title) title.textContent = '🏆 Torneo Posiciones (sin totales)';
+    if (desc)  desc.textContent  = 'Sube los 3 logs (1º-2º-3º | 4º-5º-6º | 7º-8º-9º-10º) y pulsa Procesar Jornada';
+    if (btn)   btn.textContent   = 'Totales desactivado';
   } else {
-    title.textContent = '🏆 Totales y Medias Liga';
-    desc.textContent = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
-    btn.textContent = 'Generar Totales Liga';
+    if (title) title.textContent = '🏆 Totales y Medias Liga';
+    if (desc)  desc.textContent  = 'Sube los Excels (.xlsx) generados de cada jornada para obtener totales acumulados';
+    if (btn)   btn.textContent   = 'Generar Totales Liga';
   }
 
   // Reset UI de descarga al cambiar modo
-  document.getElementById('results').style.display = 'none';
-  document.getElementById('downloadSection').style.display = 'none';
-  document.getElementById('downloadBtn').disabled = true;
+  const resDiv = document.getElementById('results');
+  const dlSec  = document.getElementById('downloadSection');
+  const dlBtn  = document.getElementById('downloadBtn');
+  if (resDiv) resDiv.style.display = 'none';
+  if (dlSec)  dlSec.style.display  = 'none';
+  if (dlBtn)  dlBtn.disabled       = true;
 
-  // Botón Totales habilitado en Liga y GP; deshabilitado en Copa, Máster y Playoff
-  const inT = document.getElementById('fileInputTotales');
+  // Botón Totales habilitado en Liga y GP; deshabilitado en Copa, Máster, Posiciones y Playoff
+  const inT    = document.getElementById('fileInputTotales');
   const btnTot = document.getElementById('processTotalesBtn');
   const btnJor = document.getElementById('processJornadaBtn');
   
-  if (competitionType === 'copa' || competitionType === 'master' || competitionType === 'posiciones'|| competitionType === 'playoff') {
-    if (btnTot) { btnTot.disabled = true; btnTot.style.opacity = '0.5'; }
+  if (competitionType === 'copa' || competitionType === 'master' || competitionType === 'posiciones' || competitionType === 'playoff') {
+    if (btnTot) { 
+      btnTot.disabled = true; 
+      btnTot.style.opacity = '0.5'; 
+    }
   } else {
-    if (btnTot) { btnTot.disabled = !(inT.files && inT.files.length); btnTot.style.opacity = '1'; }
+    if (btnTot) { 
+      btnTot.disabled = !(inT && inT.files && inT.files.length); 
+      btnTot.style.opacity = '1'; 
+    }
   }
   
   // En Playoff no hay “Procesar Jornada”
   if (btnJor) btnJor.disabled = (competitionType === 'playoff');
 
-
   // Agregar event listener para el cambio de GP Round
   const gpRoundSelect = document.getElementById('gpRoundSelect');
   if (gpRoundSelect) {
+    // Opcional: evitar duplicar listeners si cambias muchas veces de modo
+    gpRoundSelect.removeEventListener('change', onGPRoundChange);
     gpRoundSelect.addEventListener('change', onGPRoundChange);
-    onGPRoundChange(); // Llamar una vez para configurar el estado inicial
+    onGPRoundChange(); // Configurar estado inicial
   }
-  
-  }
+}
 
   function onGPRoundChange() {
     const gpRound = document.getElementById('gpRoundSelect')?.value;

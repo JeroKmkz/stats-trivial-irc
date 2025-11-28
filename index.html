@@ -514,6 +514,19 @@ function onCompetitionChange(){
   const gpBox = document.getElementById('gpRoundBox');
   gpBox.style.display = (competitionType==='gp') ? 'inline-block' : 'none';
 
+  const finalThemesBox = document.getElementById('gpFinalThemesBox');
+  const singleThemeSelect = document.getElementById('gpThemeSelect');
+  const gpRoundSelect = document.getElementById('gpRoundSelect');
+
+  if (competitionType !== 'gp') {
+    // Ocultamos por si estaba en FINAL
+    if (finalThemesBox) finalThemesBox.style.display = 'none';
+    // Devolvemos el selector simple a su estado normal
+    if (singleThemeSelect) singleThemeSelect.style.display = 'inline-block';
+    // Opcional: reseteamos la jornada GP a GP1
+    if (gpRoundSelect) gpRoundSelect.value = '1';
+  }  
+
     // Mostrar Playoff solo si se elige "playoff"
     const playoffPanel = document.getElementById('playoffPanel');
     const isPlayoff = (competitionType === 'playoff');
@@ -600,7 +613,6 @@ const COLORES_EQUIPOS = {
   "FOGUETES": {"bg": "#009F9F", "fg": "#00FF00"},
   "ATIPIK@S": {"bg": "#00FF00", "fg": "#0000FF"},
   "REPESCA@S": {"bg": "#C000C0", "fg": "#00FF00"},
-  "DARKSHADOWS": {"bg": "#000000", "fg": "#808080"},
   "TELERINEZ": {"bg": "#000000", "fg": "#00FFFF"},
   "KAMIKAZES": {"bg": "#000000", "fg": "#FF0000"},
   "HARDBE@TS": {"bg": "#000000", "fg": "#FFFF00"},

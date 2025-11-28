@@ -511,15 +511,29 @@ async function generatePlayoffExcel(){
 
 function onCompetitionChange(){
   competitionType = document.getElementById('competitionSelect').value;
+
+  // --- GP: caja de selección de jornada ---
   const gpBox = document.getElementById('gpRoundBox');
   if (gpBox) gpBox.style.display = (competitionType === 'gp') ? 'inline-block' : 'none';
 
-  // Mostrar Playoff solo si se elige "playoff"
+  // --- Playoff: panel específico ---
   const playoffPanel = document.getElementById('playoffPanel');
   const isPlayoff = (competitionType === 'playoff');
   if (playoffPanel) playoffPanel.style.display = isPlayoff ? '' : 'none';
 
-  // Cambiar textos según el tipo de competición
+  // --- NUEVO: reset específico del modo FINAL de GP al salir de GP ---
+  const finalThemesBox    = document.getElementById('gpFinalThemesBox'); // bloque de 5 temas
+  const singleThemeSelect = document.getElementById('gpThemeSelect');    // selector simple
+  const gpRoundSelect     = document.getElementById('gpRoundSelect');    // GP1, GP2... FINAL
+
+  if (competitionType !== 'gp') {
+    // Si venimos de GP (aunque estuviera en FINAL), dejamos todo "neutro"
+    if (finalThemesBox)    finalThemesBox.style.display = 'none';        // ocultar caja de 5 temas
+    if (singleThemeSelect) singleThemeSelect.style.display = 'inline-block'; // mostrar selector simple
+    if (gpRoundSelect)     gpRoundSelect.value = '1';                    // volver a GP1
+  }
+
+  // --- Textos de la caja de Totales ---
   const title = document.getElementById('totalesTitle');
   const desc  = document.getElementById('totalesDescription');
   const btn   = document.getElementById('processTotalesBtn');
@@ -546,7 +560,7 @@ function onCompetitionChange(){
     if (btn)   btn.textContent   = 'Generar Totales Liga';
   }
 
-  // Reset UI de descarga al cambiar modo
+  // --- Reset UI de descarga al cambiar modo ---
   const resDiv = document.getElementById('results');
   const dlSec  = document.getElementById('downloadSection');
   const dlBtn  = document.getElementById('downloadBtn');
@@ -554,7 +568,7 @@ function onCompetitionChange(){
   if (dlSec)  dlSec.style.display  = 'none';
   if (dlBtn)  dlBtn.disabled       = true;
 
-  // Botón Totales habilitado en Liga y GP; deshabilitado en Copa, Máster, Posiciones y Playoff
+  // --- Botón Totales habilitado solo en Liga y GP ---
   const inT    = document.getElementById('fileInputTotales');
   const btnTot = document.getElementById('processTotalesBtn');
   const btnJor = document.getElementById('processJornadaBtn');
@@ -574,13 +588,14 @@ function onCompetitionChange(){
   // En Playoff no hay “Procesar Jornada”
   if (btnJor) btnJor.disabled = (competitionType === 'playoff');
 
-  // Agregar event listener para el cambio de GP Round
-  const gpRoundSelect = document.getElementById('gpRoundSelect');
+  // --- Listener de cambio de GP Round (solo tiene sentido en GP, pero no es obligatorio) ---
   if (gpRoundSelect) {
-    // Opcional: evitar duplicar listeners si cambias muchas veces de modo
     gpRoundSelect.removeEventListener('change', onGPRoundChange);
-    gpRoundSelect.addEventListener('change', onGPRoundChange);
-    onGPRoundChange(); // Configurar estado inicial
+    // Si quieres que siga reaccionando aunque luego cambies de modo, puedes quitar este if
+    if (competitionType === 'gp') {
+      gpRoundSelect.addEventListener('change', onGPRoundChange);
+      onGPRoundChange(); // Configurar estado inicial (GP1 o lo que toque)
+    }
   }
 }
 
